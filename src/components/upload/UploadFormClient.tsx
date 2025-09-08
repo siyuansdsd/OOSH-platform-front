@@ -109,33 +109,41 @@ export default function UploadFormClient() {
     if (!validate()) return;
     setSubmitting(true);
     try {
-      // Build multipart form data per backend contract
-      const form = new FormData();
-      if (schoolName) form.append("schoolName", schoolName.trim());
-      if (is_team && groupName) form.append("groupName", groupName.trim());
-      if (is_team) {
-        members.forEach((m) => {
-          const v = m.trim();
-          if (v) form.append("members[]", v);
-        });
-      } else if (person_name.trim()) {
-        // Optional: include person_name for backend to use or ignore
-        form.append("person_name", person_name.trim());
-      }
-
+      let res: Response;
       if (mode === "file") {
+        // Send multipart with actual files
+        const form = new FormData();
+        if (schoolName) form.append("schoolName", schoolName.trim());
+        if (is_team && groupName) form.append("groupName", groupName.trim());
+        if (is_team) {
+          members.forEach((m) => {
+            const v = m.trim();
+            if (v) form.append("members[]", v);
+          });
+        } else if (person_name.trim()) {
+          form.append("person_name", person_name.trim());
+        }
         files.forEach((f) => form.append("files", f, f.name));
+        res = await fetch("/api/uploads/create-and-presign", {
+          method: "POST",
+          body: form,
+        });
       } else {
-        urls
-          .map((u) => u.trim())
-          .filter(Boolean)
-          .forEach((u) => form.append("urls[]", u));
+        // Send JSON with URLs; server route will fetch and convert to files
+        const payload = {
+          schoolName,
+          groupName: is_team ? groupName : undefined,
+          is_team,
+          members: is_team ? members : undefined,
+          person_name: !is_team ? person_name : undefined,
+          urls: urls.map((u) => u.trim()).filter(Boolean),
+        };
+        res = await fetch("/api/uploads/create-and-presign", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
       }
-
-      const res = await fetch("/api/uploads/create-and-presign", {
-        method: "POST",
-        body: form,
-      });
       if (!res.ok) {
         const text = await res.text();
         let msg = text || `HTTP ${res.status}`;
