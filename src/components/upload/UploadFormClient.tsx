@@ -84,7 +84,9 @@ export default function UploadFormClient() {
       members.forEach((m, idx) => {
         if (!m) e[`members_${idx}`] = `Member ${idx + 1} is required`;
         else if (!EN_NAME.test(m))
-          e[`members_${idx}`] = `Member ${idx + 1} must be English letters and spaces only`;
+          e[`members_${idx}`] = `Member ${
+            idx + 1
+          } must be English letters and spaces only`;
       });
     } else {
       check("person_name", person_name, "Person Name");
@@ -131,11 +133,15 @@ export default function UploadFormClient() {
         const roots = [raw, raw?.data, raw?.result, raw?.payload];
         const getFromRoots = (key: string) =>
           pickFirst(
-            ...roots.map((r) => (r && typeof r === "object" ? r[key] : undefined))
+            ...roots.map((r) =>
+              r && typeof r === "object" ? r[key] : undefined
+            )
           );
+        const homeworkObj = pickFirst(getFromRoots("homework"));
         const homeworkId = pickFirst(
           getFromRoots("homeworkId"),
           getFromRoots("homework_id"),
+          homeworkObj?.id,
           getFromRoots("id")
         );
         let presignsAny: any = pickFirst(
@@ -146,7 +152,25 @@ export default function UploadFormClient() {
           getFromRoots("signed_urls"),
           getFromRoots("files"),
           getFromRoots("file"),
-          getFromRoots("items")
+          getFromRoots("items"),
+          // Some backends embed the single presign directly in data
+          (() => {
+            const d = getFromRoots("data");
+            if (d && typeof d === "object") {
+              const hasPresignHints = [
+                "uploadUrl",
+                "presignedUrl",
+                "presigned_url",
+                "fileUrl",
+                "publicUrl",
+                "location",
+                "filename",
+                "contentType",
+              ].some((k) => k in d);
+              return hasPresignHints ? d : undefined;
+            }
+            return undefined;
+          })()
         );
         const toArray = (v: any): any[] => {
           if (!v) return [];
@@ -154,7 +178,24 @@ export default function UploadFormClient() {
           if (typeof v === "object") return Object.values(v);
           return [v];
         };
-        const presignsArr = toArray(presignsAny);
+        let presignsArr = toArray(presignsAny);
+        // Fallback: scan roots for a single-object that looks like a presign
+        if (presignsArr.length === 0) {
+          const looksLikePresign = (o: any) =>
+            o &&
+            typeof o === "object" &&
+            [
+              "uploadUrl",
+              "presignedUrl",
+              "presigned_url",
+              "fileUrl",
+              "publicUrl",
+              "location",
+              "filename",
+            ].some((k) => k in o);
+          const candidate = roots.find((r) => looksLikePresign(r));
+          if (candidate) presignsArr = [candidate];
+        }
         if (!homeworkId || presignsArr.length === 0) {
           throw new Error("No presigns returned");
         }
@@ -186,21 +227,44 @@ export default function UploadFormClient() {
           "heif",
           "tiff",
         ]);
-        const vidExt = new Set(["mp4", "mov", "webm", "avi", "mkv", "m4v", "3gp"]);
-        const getExt = (name: string) => (name.split(".").pop() || "").toLowerCase();
-        const isImg = (p: any) => (p?.contentType && String(p.contentType).startsWith("image/")) || imgExt.has(getExt(String(p.filename || "")));
-        const isVid = (p: any) => (p?.contentType && String(p.contentType).startsWith("video/")) || vidExt.has(getExt(String(p.filename || "")));
+        const vidExt = new Set([
+          "mp4",
+          "mov",
+          "webm",
+          "avi",
+          "mkv",
+          "m4v",
+          "3gp",
+        ]);
+        const getExt = (name: string) =>
+          (name.split(".").pop() || "").toLowerCase();
+        const isImg = (p: any) =>
+          (p?.contentType && String(p.contentType).startsWith("image/")) ||
+          imgExt.has(getExt(String(p.filename || "")));
+        const isVid = (p: any) =>
+          (p?.contentType && String(p.contentType).startsWith("video/")) ||
+          vidExt.has(getExt(String(p.filename || "")));
         const urlOf = (p: any) =>
-          p?.fileUrl || p?.publicUrl || p?.location || p?.url || "";
+          p?.fileUrl ||
+          p?.publicUrl ||
+          p?.location ||
+          p?.signedUrl ||
+          p?.presignedUrl ||
+          p?.url ||
+          p?.href ||
+          "";
 
         const images = presignsArr.filter(isImg).map(urlOf).filter(Boolean);
         const videos = presignsArr.filter(isVid).map(urlOf).filter(Boolean);
 
-        const writeRes = await fetch(`/api/homeworks/${encodeURIComponent(homeworkId)}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ images, videos }),
-        });
+        const writeRes = await fetch(
+          `/api/homeworks/${encodeURIComponent(homeworkId)}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ images, videos }),
+          }
+        );
         if (!writeRes.ok) {
           const text = await writeRes.text();
           let msg = text || `HTTP ${writeRes.status}`;
@@ -252,7 +316,9 @@ export default function UploadFormClient() {
           <span className="text-xl">✅</span>
           <div className="font-medium">Upload succeeded</div>
         </div>
-        <div className="mt-2 text-sm text-emerald-700/80">Thanks for your submission.</div>
+        <div className="mt-2 text-sm text-emerald-700/80">
+          Thanks for your submission.
+        </div>
       </div>
     );
   }
@@ -287,7 +353,9 @@ export default function UploadFormClient() {
           <TraditionalFields />
 
           {serverError ? (
-            <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-red-600">{serverError}</div>
+            <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-red-600">
+              {serverError}
+            </div>
           ) : null}
 
           <div className="mt-6 flex items-center gap-3">
