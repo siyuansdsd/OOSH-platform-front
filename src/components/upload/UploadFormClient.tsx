@@ -117,7 +117,11 @@ export default function UploadFormClient() {
             : urls
                 .map((u) => u.trim())
                 .filter(Boolean)
-                .map((u, i) => ({ filename: `url_${i + 1}.jpg`, contentType: "image/jpeg", sourceUrl: u })),
+                .map((u, i) => ({
+                  filename: `url_${i + 1}.jpg`,
+                  contentType: "image/jpeg",
+                  sourceUrl: u,
+                })),
         schoolName,
         groupName: is_team ? groupName : undefined,
         is_team,
@@ -165,7 +169,10 @@ export default function UploadFormClient() {
             if (!src) return;
             const r = await fetch(src);
             if (!r.ok) throw new Error(`Fetch failed for ${src}`);
-            const ct = p.contentType || r.headers.get("content-type") || "application/octet-stream";
+            const ct =
+              p.contentType ||
+              r.headers.get("content-type") ||
+              "application/octet-stream";
             const blob = await r.blob();
             const put = await fetch(p.uploadUrl, {
               method: "PUT",
@@ -179,11 +186,14 @@ export default function UploadFormClient() {
 
       // Step 3: write back fileUrl list
       const fileUrls = presigns.map((p: any) => p.fileUrl).filter(Boolean);
-      const writeRes = await fetch(`/api/homeworks/${encodeURIComponent(homeworkId)}`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ images: fileUrls }),
-      });
+      const writeRes = await fetch(
+        `/api/homeworks/${encodeURIComponent(homeworkId)}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ images: fileUrls }),
+        }
+      );
       if (!writeRes.ok) {
         const text = await writeRes.text();
         let msg = text || `HTTP ${writeRes.status}`;

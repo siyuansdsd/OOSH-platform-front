@@ -21,16 +21,13 @@ export async function POST(req: Request) {
       });
     } else {
       // File mode: forward multipart/form-data as-is
-      res = await fetch(
-        `${base}/api/uploads/create-and-presign`,
-        {
-          method: "POST",
-          headers: contentType ? { "content-type": contentType } : undefined,
-          body: req.body,
-          // req.body is a ReadableStream; undici requires duplex: 'half'
-          duplex: "half" as any,
-        } as any
-      );
+      res = await fetch(`${base}/api/uploads/create-and-presign`, {
+        method: "POST",
+        headers: contentType ? { "content-type": contentType } : undefined,
+        body: req.body,
+        // req.body is a ReadableStream; undici requires duplex: 'half'
+        duplex: "half" as any,
+      } as any);
     }
     const text = await res.text();
     return new NextResponse(text, {

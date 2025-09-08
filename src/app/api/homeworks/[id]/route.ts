@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 export async function PUT(
-  req: Request,
-  { params }: { params: { id: string } }
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const base = process.env.NEXT_PUBLIC_API_BASE ?? process.env.API_BASE;
@@ -12,7 +12,7 @@ export async function PUT(
         { status: 500 }
       );
     }
-    const id = params.id;
+  const { id } = await params;
     const json = await req.json().catch(() => ({}));
     const res = await fetch(`${base}/api/homeworks/${encodeURIComponent(id)}`, {
       method: "PUT",
