@@ -29,14 +29,13 @@ export default function UrlUploader() {
         >
           <div>
             <label className="block">
-              <div className="mb-1 text-sm text-foreground/80">
-                页面链接 URL
-              </div>
+              <div className="mb-1 text-sm text-foreground/80">Page URL</div>
               <input
                 value={u}
                 onChange={(e) => setOne(idx, e.target.value)}
+                onBlur={(e) => setOne(idx, e.target.value.trim())}
                 disabled={disabled}
-                placeholder="https://example.com/page"
+                placeholder="https://example.com/page-image.jpg"
                 className={baseInput}
               />
             </label>
@@ -53,7 +52,7 @@ export default function UrlUploader() {
               disabled={disabled}
               className="h-10 rounded-xl bg-blue-600 px-4 text-white text-sm font-medium shadow-lg shadow-blue-600/20 transition-all duration-200 active:scale-[0.98] disabled:opacity-60"
             >
-              + 新增 URL
+              + Add URL
             </button>
             {urls.length > 1 && (
               <button
@@ -62,7 +61,7 @@ export default function UrlUploader() {
                 disabled={disabled}
                 className="h-10 rounded-xl border border-foreground/15 px-4 text-sm transition-colors hover:bg-white/10"
               >
-                移除
+                Remove
               </button>
             )}
           </div>

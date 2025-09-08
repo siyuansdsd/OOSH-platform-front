@@ -19,8 +19,8 @@ export interface UploadContextType {
   setGroupName: (v: string) => void;
   is_team: boolean;
   setIsTeam: (v: boolean) => void;
-  members: string;
-  setMembers: (v: string) => void;
+  members: string[];
+  setMembers: (v: string[]) => void;
   person_name: string;
   setPersonName: (v: string) => void;
   errors: ValidationErrors;

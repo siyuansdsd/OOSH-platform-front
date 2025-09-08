@@ -38,9 +38,9 @@ export default function FileDropzone({
       const combined = [...value, ...list].slice(0, maxCount);
       const bytes = combined.reduce((a, f) => a + f.size, 0);
       if (combined.length > maxCount) {
-        setError(`最多选择 ${maxCount} 个文件`);
+        setError(`Up to ${maxCount} files allowed`);
       } else if (bytes > maxTotalBytes) {
-        setError("总大小需小于 200MB");
+        setError("Total size must be under 200MB");
         return; // don't update if size fails
       }
       onChange(combined);
@@ -122,7 +122,7 @@ export default function FileDropzone({
         <p className="text-xs text-red-500">{error}</p>
       ) : (
         <p className="text-xs text-foreground/60">
-          已选择 {value.length} 个，合计{" "}
+          Selected {value.length} • Total{" "}
           {(totalBytes / (1024 * 1024)).toFixed(1)} MB
         </p>
       )}
@@ -158,7 +158,7 @@ export default function FileDropzone({
                 onClick={() => removeAt(idx)}
                 className="text-xs text-red-500 hover:text-red-600 px-2 py-1 rounded-md border border-red-500/20 hover:border-red-500/40 transition-colors"
               >
-                移除
+                Remove
               </button>
             </li>
           ))}
