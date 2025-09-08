@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "OOSH Platform",
+  title: "MaxHacker OOSH Platform",
   description: "A minimal upload platform",
 };
 
@@ -28,9 +28,9 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <header className="sticky top-0 z-20 backdrop-blur supports-[backdrop-filter]:bg-white/40 dark:supports-[backdrop-filter]:bg-black/30 border-b border-foreground/10">
-          <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
+          <div className="mx-auto max-w-6xl px-2 py-3 flex items-center justify-between">
             <a href="/" className="font-semibold">
-              OOSH
+              MaxHacker
             </a>
             <nav className="text-sm">
               <a className="hover:underline" href="/upload">
