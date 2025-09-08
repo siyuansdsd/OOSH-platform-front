@@ -109,50 +109,91 @@ export default function UploadFormClient() {
     if (!validate()) return;
     setSubmitting(true);
     try {
-      let res: Response;
-      if (mode === "file") {
-        // Send multipart with actual files
-        const form = new FormData();
-        if (schoolName) form.append("schoolName", schoolName.trim());
-        if (is_team && groupName) form.append("groupName", groupName.trim());
-        if (is_team) {
-          members.forEach((m) => {
-            const v = m.trim();
-            if (v) form.append("members[]", v);
-          });
-        } else if (person_name.trim()) {
-          form.append("person_name", person_name.trim());
-        }
-        files.forEach((f) => form.append("files", f, f.name));
-        res = await fetch("/api/uploads/create-and-presign", {
-          method: "POST",
-          body: form,
-        });
-      } else {
-        // Send JSON with URLs; server route will fetch and convert to files
-        const payload = {
-          schoolName,
-          groupName: is_team ? groupName : undefined,
-          is_team,
-          members: is_team ? members : undefined,
-          person_name: !is_team ? person_name : undefined,
-          urls: urls.map((u) => u.trim()).filter(Boolean),
-        };
-        res = await fetch("/api/uploads/create-and-presign", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-      }
-      if (!res.ok) {
-        const text = await res.text();
-        let msg = text || `HTTP ${res.status}`;
+      // Step 1: request presigns
+      const presignReq = {
+        files:
+          mode === "file"
+            ? files.map((f) => ({ filename: f.name, contentType: f.type }))
+            : urls
+                .map((u) => u.trim())
+                .filter(Boolean)
+                .map((u, i) => ({ filename: `url_${i + 1}.jpg`, contentType: "image/jpeg", sourceUrl: u })),
+        schoolName,
+        groupName: is_team ? groupName : undefined,
+        is_team,
+        members: is_team ? members : undefined,
+        person_name: !is_team ? person_name : undefined,
+        mode,
+      } as any;
+
+      const presignRes = await fetch("/api/uploads/create-and-presign", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(presignReq),
+      });
+      if (!presignRes.ok) {
+        const text = await presignRes.text();
+        let msg = text || `HTTP ${presignRes.status}`;
         try {
           const obj = JSON.parse(text);
           msg = obj?.message || obj?.error || msg;
         } catch {}
         throw new Error(msg);
       }
+      const { homeworkId, presigns } = await presignRes.json();
+
+      // Step 2: PUT binaries to S3 using presigns
+      if (mode === "file") {
+        await Promise.all(
+          presigns.map(async (p: any) => {
+            const f = files.find((x) => x.name === p.filename);
+            if (!f) return;
+            const put = await fetch(p.uploadUrl, {
+              method: "PUT",
+              headers: { "Content-Type": p.contentType || f.type },
+              body: f,
+            });
+            if (!put.ok) throw new Error(`Upload failed for ${p.filename}`);
+          })
+        );
+      } else {
+        // URL mode: fetch each URL as blob and upload
+        const cleaned = urls.map((u) => u.trim()).filter(Boolean);
+        await Promise.all(
+          presigns.map(async (p: any, idx: number) => {
+            const src = cleaned[idx];
+            if (!src) return;
+            const r = await fetch(src);
+            if (!r.ok) throw new Error(`Fetch failed for ${src}`);
+            const ct = p.contentType || r.headers.get("content-type") || "application/octet-stream";
+            const blob = await r.blob();
+            const put = await fetch(p.uploadUrl, {
+              method: "PUT",
+              headers: { "Content-Type": ct },
+              body: blob,
+            });
+            if (!put.ok) throw new Error(`Upload failed for ${p.filename}`);
+          })
+        );
+      }
+
+      // Step 3: write back fileUrl list
+      const fileUrls = presigns.map((p: any) => p.fileUrl).filter(Boolean);
+      const writeRes = await fetch(`/api/homeworks/${encodeURIComponent(homeworkId)}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ images: fileUrls }),
+      });
+      if (!writeRes.ok) {
+        const text = await writeRes.text();
+        let msg = text || `HTTP ${writeRes.status}`;
+        try {
+          const obj = JSON.parse(text);
+          msg = obj?.message || obj?.error || msg;
+        } catch {}
+        throw new Error(msg);
+      }
+
       setSuccess(true);
     } catch (err: any) {
       setServerError(err?.message || "Submit failed");
