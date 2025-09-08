@@ -126,7 +126,16 @@ export default function UploadFormClient() {
           } catch {}
           throw new Error(msg);
         }
-        const raw: any = await presignRes.json().catch(() => ({}));
+        const rawText = await presignRes.clone().text().catch(() => "");
+        const raw: any = await presignRes
+          .json()
+          .catch(() => {
+            try {
+              return rawText ? JSON.parse(rawText) : {};
+            } catch {
+              return {};
+            }
+          });
         // Robust extractor: handles single-object, arrays, maps, and various envelope keys
         const pickFirst = (...vals: any[]) =>
           vals.find((v) => v !== undefined && v !== null);
@@ -179,25 +188,43 @@ export default function UploadFormClient() {
           return [v];
         };
         let presignsArr = toArray(presignsAny);
-        // Fallback: scan roots for a single-object that looks like a presign
+        // Helper to recognize presign-ish objects
+        const looksLikePresign = (o: any) =>
+          o &&
+          typeof o === "object" &&
+          [
+            "uploadUrl",
+            "presignedUrl",
+            "presigned_url",
+            "fileUrl",
+            "publicUrl",
+            "location",
+            "filename",
+          ].some((k) => k in o);
+        // Fallback: scan roots for a single-object
         if (presignsArr.length === 0) {
-          const looksLikePresign = (o: any) =>
-            o &&
-            typeof o === "object" &&
-            [
-              "uploadUrl",
-              "presignedUrl",
-              "presigned_url",
-              "fileUrl",
-              "publicUrl",
-              "location",
-              "filename",
-            ].some((k) => k in o);
           const candidate = roots.find((r) => looksLikePresign(r));
-          if (candidate) presignsArr = [candidate];
+          if (candidate) presignsArr = [candidate as any];
+        }
+        // Fallback: arrays at root or envelopes
+        if (presignsArr.length === 0) {
+          const arrayRoot = roots.find((r) => Array.isArray(r)) as any[] | undefined;
+          if (arrayRoot && arrayRoot.some((it) => looksLikePresign(it))) {
+            presignsArr = arrayRoot.filter((it) => looksLikePresign(it));
+          }
+        }
+        if (presignsArr.length === 0) {
+          for (const k of ["data", "result", "payload"]) {
+            const arr = (raw as any)?.[k];
+            if (Array.isArray(arr) && arr.some((it: any) => looksLikePresign(it))) {
+              presignsArr = arr.filter((it: any) => looksLikePresign(it));
+              break;
+            }
+          }
         }
         if (!homeworkId || presignsArr.length === 0) {
-          throw new Error("No presigns returned");
+          const snippet = (rawText || "").slice(0, 200);
+          throw new Error(`No presigns returned${snippet ? `: ${snippet}` : ""}`);
         }
 
         // Upload to S3
