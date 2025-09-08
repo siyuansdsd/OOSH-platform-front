@@ -12,7 +12,7 @@ export async function PUT(
         { status: 500 }
       );
     }
-  const { id } = await params;
+    const { id } = await params;
     const json = await req.json().catch(() => ({}));
     const res = await fetch(`${base}/api/homeworks/${encodeURIComponent(id)}`, {
       method: "PUT",

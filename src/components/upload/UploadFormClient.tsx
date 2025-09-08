@@ -184,14 +184,56 @@ export default function UploadFormClient() {
         );
       }
 
-      // Step 3: write back fileUrl list
-      const fileUrls = presigns.map((p: any) => p.fileUrl).filter(Boolean);
+      // Step 3: write back fileUrl list (split images/videos)
+      const imgExt = new Set([
+        "jpg",
+        "jpeg",
+        "png",
+        "gif",
+        "webp",
+        "bmp",
+        "svg",
+        "heic",
+        "heif",
+        "tiff",
+      ]);
+      const vidExt = new Set([
+        "mp4",
+        "mov",
+        "webm",
+        "avi",
+        "mkv",
+        "m4v",
+        "3gp",
+      ]);
+      const getExt = (name: string) =>
+        (name.split(".").pop() || "").toLowerCase();
+      const isImg = (p: any) =>
+        (p?.contentType && String(p.contentType).startsWith("image/")) ||
+        imgExt.has(getExt(String(p.filename || "")));
+      const isVid = (p: any) =>
+        (p?.contentType && String(p.contentType).startsWith("video/")) ||
+        vidExt.has(getExt(String(p.filename || "")));
+
+      const images = presigns
+        .filter((p: any) => isImg(p))
+        .map((p: any) => p.fileUrl)
+        .filter(Boolean);
+      const videos = presigns
+        .filter((p: any) => isVid(p))
+        .map((p: any) => p.fileUrl)
+        .filter(Boolean);
+
+      const payload: Record<string, any> = {};
+      if (images.length) payload.images = images;
+      if (videos.length) payload.videos = videos;
+
       const writeRes = await fetch(
         `/api/homeworks/${encodeURIComponent(homeworkId)}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ images: fileUrls }),
+          body: JSON.stringify(payload),
         }
       );
       if (!writeRes.ok) {
