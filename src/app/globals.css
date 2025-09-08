@@ -24,3 +24,17 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+* {
+  outline-color: #3b82f6;
+}
+
+@keyframes input-pop {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.01); }
+  100% { transform: scale(1); }
+}
+
+input:focus-visible, textarea:focus-visible, button:active {
+  animation: input-pop 180ms ease-in-out;
+}

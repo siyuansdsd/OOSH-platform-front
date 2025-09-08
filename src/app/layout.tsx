@@ -27,7 +27,19 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <header className="sticky top-0 z-20 backdrop-blur supports-[backdrop-filter]:bg-white/40 dark:supports-[backdrop-filter]:bg-black/30 border-b border-foreground/10">
+          <div className="mx-auto max-w-6xl px-4 py-3 flex items-center justify-between">
+            <a href="/" className="font-semibold">
+              OOSH
+            </a>
+            <nav className="text-sm">
+              <a className="hover:underline" href="/upload">
+                Upload
+              </a>
+            </nav>
+          </div>
+        </header>
+        <main>{children}</main>
       </body>
     </html>
   );
