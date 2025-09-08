@@ -124,19 +124,40 @@ export default function UploadFormClient() {
           } catch {}
           throw new Error(msg);
         }
-        const data: any = await presignRes.json().catch(() => ({}));
-        const homeworkId = data?.homeworkId ?? data?.data?.homeworkId;
-        const presignsArr: any[] = Array.isArray(data?.presigns)
-          ? data.presigns
-          : Array.isArray(data?.data?.presigns)
-          ? data.data.presigns
-          : data?.presigns
-          ? [data.presigns]
-          : data?.data?.presigns
-          ? [data.data.presigns]
-          : [];
-        if (!homeworkId || presignsArr.length === 0)
+        const raw: any = await presignRes.json().catch(() => ({}));
+        // Robust extractor: handles single-object, arrays, maps, and various envelope keys
+        const pickFirst = (...vals: any[]) =>
+          vals.find((v) => v !== undefined && v !== null);
+        const roots = [raw, raw?.data, raw?.result, raw?.payload];
+        const getFromRoots = (key: string) =>
+          pickFirst(
+            ...roots.map((r) => (r && typeof r === "object" ? r[key] : undefined))
+          );
+        const homeworkId = pickFirst(
+          getFromRoots("homeworkId"),
+          getFromRoots("homework_id"),
+          getFromRoots("id")
+        );
+        let presignsAny: any = pickFirst(
+          getFromRoots("presigns"),
+          getFromRoots("presign"),
+          getFromRoots("signed"),
+          getFromRoots("signedUrls"),
+          getFromRoots("signed_urls"),
+          getFromRoots("files"),
+          getFromRoots("file"),
+          getFromRoots("items")
+        );
+        const toArray = (v: any): any[] => {
+          if (!v) return [];
+          if (Array.isArray(v)) return v;
+          if (typeof v === "object") return Object.values(v);
+          return [v];
+        };
+        const presignsArr = toArray(presignsAny);
+        if (!homeworkId || presignsArr.length === 0) {
           throw new Error("No presigns returned");
+        }
 
         // Upload to S3
         await Promise.all(
@@ -169,7 +190,8 @@ export default function UploadFormClient() {
         const getExt = (name: string) => (name.split(".").pop() || "").toLowerCase();
         const isImg = (p: any) => (p?.contentType && String(p.contentType).startsWith("image/")) || imgExt.has(getExt(String(p.filename || "")));
         const isVid = (p: any) => (p?.contentType && String(p.contentType).startsWith("video/")) || vidExt.has(getExt(String(p.filename || "")));
-        const urlOf = (p: any) => p?.fileUrl || p?.url || "";
+        const urlOf = (p: any) =>
+          p?.fileUrl || p?.publicUrl || p?.location || p?.url || "";
 
         const images = presignsArr.filter(isImg).map(urlOf).filter(Boolean);
         const videos = presignsArr.filter(isVid).map(urlOf).filter(Boolean);
