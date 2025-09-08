@@ -109,45 +109,33 @@ export default function UploadFormClient() {
     if (!validate()) return;
     setSubmitting(true);
     try {
-      // Step 1: request presigns
-      const presignReq = {
-        files:
-          mode === "file"
-            ? files.map((f) => ({ filename: f.name, contentType: f.type }))
-            : urls
-                .map((u) => u.trim())
-                .filter(Boolean)
-                .map((u, i) => ({
-                  filename: `url_${i + 1}.jpg`,
-                  contentType: "image/jpeg",
-                  sourceUrl: u,
-                })),
-        schoolName,
-        groupName: is_team ? groupName : undefined,
-        is_team,
-        members: is_team ? members : undefined,
-        person_name: !is_team ? person_name : undefined,
-        mode,
-      } as any;
-
-      const presignRes = await fetch("/api/uploads/create-and-presign", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(presignReq),
-      });
-      if (!presignRes.ok) {
-        const text = await presignRes.text();
-        let msg = text || `HTTP ${presignRes.status}`;
-        try {
-          const obj = JSON.parse(text);
-          msg = obj?.message || obj?.error || msg;
-        } catch {}
-        throw new Error(msg);
-      }
-      const { homeworkId, presigns } = await presignRes.json();
-
-      // Step 2: PUT binaries to S3 using presigns
       if (mode === "file") {
+        // 保持 presign 文件直传流程（不改动）
+        const presignReq = {
+          files: files.map((f) => ({ filename: f.name, contentType: f.type })),
+          schoolName,
+          groupName: is_team ? groupName : undefined,
+          is_team,
+          members: is_team ? members : undefined,
+          person_name: !is_team ? person_name : undefined,
+          mode,
+        } as any;
+
+        const presignRes = await fetch("/api/uploads/create-and-presign", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(presignReq),
+        });
+        if (!presignRes.ok) {
+          const text = await presignRes.text();
+          let msg = text || `HTTP ${presignRes.status}`;
+          try {
+            const obj = JSON.parse(text);
+            msg = obj?.message || obj?.error || msg;
+          } catch {}
+          throw new Error(msg);
+        }
+        const { homeworkId, presigns } = await presignRes.json();
         await Promise.all(
           presigns.map(async (p: any) => {
             const f = files.find((x) => x.name === p.filename);
@@ -160,90 +148,49 @@ export default function UploadFormClient() {
             if (!put.ok) throw new Error(`Upload failed for ${p.filename}`);
           })
         );
-      } else {
-        // URL mode: fetch each URL as blob and upload
-        const cleaned = urls.map((u) => u.trim()).filter(Boolean);
-        await Promise.all(
-          presigns.map(async (p: any, idx: number) => {
-            const src = cleaned[idx];
-            if (!src) return;
-            const r = await fetch(src);
-            if (!r.ok) throw new Error(`Fetch failed for ${src}`);
-            const ct =
-              p.contentType ||
-              r.headers.get("content-type") ||
-              "application/octet-stream";
-            const blob = await r.blob();
-            const put = await fetch(p.uploadUrl, {
-              method: "PUT",
-              headers: { "Content-Type": ct },
-              body: blob,
-            });
-            if (!put.ok) throw new Error(`Upload failed for ${p.filename}`);
-          })
+        const fileUrls = presigns.map((p: any) => p.fileUrl).filter(Boolean);
+        const writeRes = await fetch(
+          `/api/homeworks/${encodeURIComponent(homeworkId)}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ images: fileUrls }),
+          }
         );
-      }
-
-      // Step 3: write back fileUrl list (split images/videos)
-      const imgExt = new Set([
-        "jpg",
-        "jpeg",
-        "png",
-        "gif",
-        "webp",
-        "bmp",
-        "svg",
-        "heic",
-        "heif",
-        "tiff",
-      ]);
-      const vidExt = new Set([
-        "mp4",
-        "mov",
-        "webm",
-        "avi",
-        "mkv",
-        "m4v",
-        "3gp",
-      ]);
-      const getExt = (name: string) =>
-        (name.split(".").pop() || "").toLowerCase();
-      const isImg = (p: any) =>
-        (p?.contentType && String(p.contentType).startsWith("image/")) ||
-        imgExt.has(getExt(String(p.filename || "")));
-      const isVid = (p: any) =>
-        (p?.contentType && String(p.contentType).startsWith("video/")) ||
-        vidExt.has(getExt(String(p.filename || "")));
-
-      const images = presigns
-        .filter((p: any) => isImg(p))
-        .map((p: any) => p.fileUrl)
-        .filter(Boolean);
-      const videos = presigns
-        .filter((p: any) => isVid(p))
-        .map((p: any) => p.fileUrl)
-        .filter(Boolean);
-
-      const payload: Record<string, any> = {};
-      if (images.length) payload.images = images;
-      if (videos.length) payload.videos = videos;
-
-      const writeRes = await fetch(
-        `/api/homeworks/${encodeURIComponent(homeworkId)}`,
-        {
-          method: "PUT",
+        if (!writeRes.ok) {
+          const text = await writeRes.text();
+          let msg = text || `HTTP ${writeRes.status}`;
+          try {
+            const obj = JSON.parse(text);
+            msg = obj?.message || obj?.error || msg;
+          } catch {}
+          throw new Error(msg);
+        }
+      } else {
+        // URL-only 模式：直接 POST /api/homeworks
+        const cleaned = urls.map((u) => u.trim()).filter(Boolean);
+        const payload = {
+          school_name: schoolName,
+          is_team,
+          person_name: !is_team ? person_name : undefined,
+          group_name: is_team ? groupName : undefined,
+          members: is_team ? members : undefined,
+          urls: cleaned,
+        };
+        const res = await fetch("/api/homeworks", {
+          method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
+        });
+        if (!res.ok) {
+          const text = await res.text();
+          let msg = text || `HTTP ${res.status}`;
+          try {
+            const obj = JSON.parse(text);
+            msg = obj?.message || obj?.error || msg;
+          } catch {}
+          throw new Error(msg);
         }
-      );
-      if (!writeRes.ok) {
-        const text = await writeRes.text();
-        let msg = text || `HTTP ${writeRes.status}`;
-        try {
-          const obj = JSON.parse(text);
-          msg = obj?.message || obj?.error || msg;
-        } catch {}
-        throw new Error(msg);
       }
 
       setSuccess(true);
