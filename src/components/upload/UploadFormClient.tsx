@@ -3,7 +3,7 @@
 import React, { useMemo, useState } from "react";
 import UploadTypeSelector from "./UploadTypeSelector";
 import FileDropzone from "./FileDropzone";
-import UrlUploader from "./UrlUploader";
+import UrlUploader from "@/components/upload/UrlUploader";
 import { Spinner } from "../ui/Spinner";
 import {
   UploadContext,
@@ -17,17 +17,15 @@ export default function UploadFormClient() {
   const [mode, setMode] = useState<UploadMode>("file");
   const [files, setFiles] = useState<File[]>([]);
   const [urls, setUrls] = useState<string[]>([""]);
-
   const [schoolName, setSchoolName] = useState("");
   const [groupName, setGroupName] = useState("");
   const [is_team, setIsTeam] = useState(false);
   const [members, setMembers] = useState<string[]>([""]);
   const [person_name, setPersonName] = useState("");
-
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [submitting, setSubmitting] = useState(false);
-  const [success, setSuccess] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   const ctxValue = useMemo(
     () => ({
@@ -52,50 +50,41 @@ export default function UploadFormClient() {
       disabled: submitting,
     }),
     [
-      errors,
+      mode,
       files,
+      urls,
+      schoolName,
       groupName,
       is_team,
       members,
-      mode,
       person_name,
-      schoolName,
+      errors,
       submitting,
-      urls,
     ]
   );
 
   const validate = (): boolean => {
     const e: ValidationErrors = {};
     const check = (key: string, val: string, label: string) => {
-      if (!val) {
-        e[key] = `${label} is required`;
-      } else if (!EN_NAME.test(val)) {
+      if (!val) e[key] = `${label} is required`;
+      else if (!EN_NAME.test(val))
         e[key] = `${label} must be English letters and spaces only`;
-      }
     };
     check("schoolName", schoolName, "School Name");
-    // Require at least one content entry
+
     if (mode === "file") {
-      if (!files.length) {
-        e.files = "Please add at least one image or video";
-      }
+      if (!files.length) e.files = "Please add at least one image or video";
     } else {
       const cleaned = urls.map((u) => u.trim()).filter(Boolean);
-      if (!cleaned.length) {
-        e.urls = "Please add at least one URL";
-      }
+      if (!cleaned.length) e.urls = "Please add at least one URL";
     }
+
     if (is_team) {
       check("groupName", groupName, "Team Name");
       members.forEach((m, idx) => {
-        if (!m) {
-          e[`members_${idx}`] = `Member ${idx + 1} is required`;
-        } else if (!EN_NAME.test(m)) {
-          e[`members_${idx}`] = `Member ${
-            idx + 1
-          } must be English letters and spaces only`;
-        }
+        if (!m) e[`members_${idx}`] = `Member ${idx + 1} is required`;
+        else if (!EN_NAME.test(m))
+          e[`members_${idx}`] = `Member ${idx + 1} must be English letters and spaces only`;
       });
     } else {
       check("person_name", person_name, "Person Name");
@@ -110,7 +99,7 @@ export default function UploadFormClient() {
     setSubmitting(true);
     try {
       if (mode === "file") {
-        // 保持 presign 文件直传流程（不改动）
+        // Presign JSON flow: request presigns -> PUT to S3 -> write-back
         const presignReq = {
           files: files.map((f) => ({ filename: f.name, contentType: f.type })),
           schoolName,
@@ -135,11 +124,25 @@ export default function UploadFormClient() {
           } catch {}
           throw new Error(msg);
         }
-        const { homeworkId, presigns } = await presignRes.json();
+        const data: any = await presignRes.json().catch(() => ({}));
+        const homeworkId = data?.homeworkId ?? data?.data?.homeworkId;
+        const presignsArr: any[] = Array.isArray(data?.presigns)
+          ? data.presigns
+          : Array.isArray(data?.data?.presigns)
+          ? data.data.presigns
+          : data?.presigns
+          ? [data.presigns]
+          : data?.data?.presigns
+          ? [data.data.presigns]
+          : [];
+        if (!homeworkId || presignsArr.length === 0)
+          throw new Error("No presigns returned");
+
+        // Upload to S3
         await Promise.all(
-          presigns.map(async (p: any) => {
+          presignsArr.map(async (p: any) => {
             const f = files.find((x) => x.name === p.filename);
-            if (!f) return;
+            if (!f || !p?.uploadUrl) return;
             const put = await fetch(p.uploadUrl, {
               method: "PUT",
               headers: { "Content-Type": p.contentType || f.type },
@@ -148,15 +151,34 @@ export default function UploadFormClient() {
             if (!put.ok) throw new Error(`Upload failed for ${p.filename}`);
           })
         );
-        const fileUrls = presigns.map((p: any) => p.fileUrl).filter(Boolean);
-        const writeRes = await fetch(
-          `/api/homeworks/${encodeURIComponent(homeworkId)}`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ images: fileUrls }),
-          }
-        );
+
+        // Classify images/videos and write back
+        const imgExt = new Set([
+          "jpg",
+          "jpeg",
+          "png",
+          "gif",
+          "webp",
+          "bmp",
+          "svg",
+          "heic",
+          "heif",
+          "tiff",
+        ]);
+        const vidExt = new Set(["mp4", "mov", "webm", "avi", "mkv", "m4v", "3gp"]);
+        const getExt = (name: string) => (name.split(".").pop() || "").toLowerCase();
+        const isImg = (p: any) => (p?.contentType && String(p.contentType).startsWith("image/")) || imgExt.has(getExt(String(p.filename || "")));
+        const isVid = (p: any) => (p?.contentType && String(p.contentType).startsWith("video/")) || vidExt.has(getExt(String(p.filename || "")));
+        const urlOf = (p: any) => p?.fileUrl || p?.url || "";
+
+        const images = presignsArr.filter(isImg).map(urlOf).filter(Boolean);
+        const videos = presignsArr.filter(isVid).map(urlOf).filter(Boolean);
+
+        const writeRes = await fetch(`/api/homeworks/${encodeURIComponent(homeworkId)}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ images, videos }),
+        });
         if (!writeRes.ok) {
           const text = await writeRes.text();
           let msg = text || `HTTP ${writeRes.status}`;
@@ -167,7 +189,7 @@ export default function UploadFormClient() {
           throw new Error(msg);
         }
       } else {
-        // URL-only 模式：直接 POST /api/homeworks
+        // URL-only flow: direct POST
         const cleaned = urls.map((u) => u.trim()).filter(Boolean);
         const payload = {
           school_name: schoolName,
@@ -208,9 +230,7 @@ export default function UploadFormClient() {
           <span className="text-xl">✅</span>
           <div className="font-medium">Upload succeeded</div>
         </div>
-        <div className="mt-2 text-sm text-emerald-700/80">
-          Thanks for your submission.
-        </div>
+        <div className="mt-2 text-sm text-emerald-700/80">Thanks for your submission.</div>
       </div>
     );
   }
@@ -221,12 +241,10 @@ export default function UploadFormClient() {
         <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6 backdrop-blur-md">
           <h2 className="text-xl font-semibold mb-4">Content Upload</h2>
 
-          {/* Selector */}
           <div className="mb-6">
             <UploadTypeSelector />
           </div>
 
-          {/* Conditional UIs */}
           {mode === "file" ? (
             <div className="mb-6">
               <FileDropzone />
@@ -237,7 +255,6 @@ export default function UploadFormClient() {
             </div>
           )}
 
-          {/* Content errors */}
           {errors.files && (
             <p className="-mt-4 mb-4 text-xs text-red-500">{errors.files}</p>
           )}
@@ -245,17 +262,12 @@ export default function UploadFormClient() {
             <p className="-mt-4 mb-4 text-xs text-red-500">{errors.urls}</p>
           )}
 
-          {/* Traditional Fields */}
           <TraditionalFields />
 
-          {/* Error Banner */}
           {serverError ? (
-            <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-red-600">
-              {serverError}
-            </div>
+            <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-red-600">{serverError}</div>
           ) : null}
 
-          {/* Submit */}
           <div className="mt-6 flex items-center gap-3">
             <button
               type="button"
