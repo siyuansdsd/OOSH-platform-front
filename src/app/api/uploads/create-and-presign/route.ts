@@ -9,11 +9,12 @@ export async function POST(req: Request) {
         { status: 500 }
       );
     }
-    const body = await req.json();
+    // Forward multipart/form-data as-is
+    const contentType = req.headers.get("content-type") || undefined;
     const res = await fetch(`${base}/api/uploads/create-and-presign`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      headers: contentType ? { "content-type": contentType } : undefined,
+      body: req.body,
     });
     const text = await res.text();
     return new NextResponse(text, {

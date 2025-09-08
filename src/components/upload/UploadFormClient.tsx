@@ -75,6 +75,17 @@ export default function UploadFormClient() {
       }
     };
     check("schoolName", schoolName, "School Name");
+    // Require at least one content entry
+    if (mode === "file") {
+      if (!files.length) {
+        e.files = "Please add at least one image or video";
+      }
+    } else {
+      const cleaned = urls.map((u) => u.trim()).filter(Boolean);
+      if (!cleaned.length) {
+        e.urls = "Please add at least one URL";
+      }
+    }
     if (is_team) {
       check("groupName", groupName, "Team Name");
       members.forEach((m, idx) => {
@@ -98,33 +109,41 @@ export default function UploadFormClient() {
     if (!validate()) return;
     setSubmitting(true);
     try {
-      // Prepare payload: send metadata only; backend may return presigned URLs
-      const payload = {
-        schoolName,
-        groupName: is_team ? groupName : undefined,
-        is_team,
-        members: is_team ? members : undefined,
-        person_name: !is_team ? person_name : undefined,
-        mode,
-        fileMetas:
-          mode === "file"
-            ? files.map((f) => ({
-                filename: f.name,
-                contentType: f.type,
-                size: f.size,
-              }))
-            : [],
-        urls: mode === "url" ? urls.filter((u) => u.trim()) : [],
-      };
+      // Build multipart form data per backend contract
+      const form = new FormData();
+      if (schoolName) form.append("schoolName", schoolName.trim());
+      if (is_team && groupName) form.append("groupName", groupName.trim());
+      if (is_team) {
+        members.forEach((m) => {
+          const v = m.trim();
+          if (v) form.append("members[]", v);
+        });
+      } else if (person_name.trim()) {
+        // Optional: include person_name for backend to use or ignore
+        form.append("person_name", person_name.trim());
+      }
+
+      if (mode === "file") {
+        files.forEach((f) => form.append("files", f, f.name));
+      } else {
+        urls
+          .map((u) => u.trim())
+          .filter(Boolean)
+          .forEach((u) => form.append("urls[]", u));
+      }
 
       const res = await fetch("/api/uploads/create-and-presign", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: form,
       });
       if (!res.ok) {
         const text = await res.text();
-        throw new Error(text || `HTTP ${res.status}`);
+        let msg = text || `HTTP ${res.status}`;
+        try {
+          const obj = JSON.parse(text);
+          msg = obj?.message || obj?.error || msg;
+        } catch {}
+        throw new Error(msg);
       }
       setSuccess(true);
     } catch (err: any) {
@@ -168,6 +187,14 @@ export default function UploadFormClient() {
             <div className="mb-6">
               <UrlUploader />
             </div>
+          )}
+
+          {/* Content errors */}
+          {errors.files && (
+            <p className="-mt-4 mb-4 text-xs text-red-500">{errors.files}</p>
+          )}
+          {errors.urls && (
+            <p className="-mt-4 mb-4 text-xs text-red-500">{errors.urls}</p>
           )}
 
           {/* Traditional Fields */}
