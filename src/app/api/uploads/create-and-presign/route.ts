@@ -49,11 +49,14 @@ export async function POST(req: Request) {
       });
     }
 
-    const pickFirst = (...vals: any[]) => vals.find((v) => v !== undefined && v !== null);
+    const pickFirst = (...vals: any[]) =>
+      vals.find((v) => v !== undefined && v !== null);
     const roots = [data, data?.data, data?.result, data?.payload];
     const getFromRoots = (key: string) =>
       pickFirst(
-        ...roots.map((r) => (r && typeof r === "object" ? (r as any)[key] : undefined))
+        ...roots.map((r) =>
+          r && typeof r === "object" ? (r as any)[key] : undefined
+        )
       );
 
     const homeworkObj = pickFirst(getFromRoots("homework"));
@@ -106,7 +109,9 @@ export async function POST(req: Request) {
       if (candidate) presignsArr = [candidate as any];
     }
     if (presignsArr.length === 0) {
-      const arrayRoot = roots.find((r) => Array.isArray(r)) as any[] | undefined;
+      const arrayRoot = roots.find((r) => Array.isArray(r)) as
+        | any[]
+        | undefined;
       if (arrayRoot && arrayRoot.some((it) => looksLikePresign(it))) {
         presignsArr = arrayRoot.filter((it) => looksLikePresign(it));
       }

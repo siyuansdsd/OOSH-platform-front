@@ -126,16 +126,17 @@ export default function UploadFormClient() {
           } catch {}
           throw new Error(msg);
         }
-        const rawText = await presignRes.clone().text().catch(() => "");
-        const raw: any = await presignRes
-          .json()
-          .catch(() => {
-            try {
-              return rawText ? JSON.parse(rawText) : {};
-            } catch {
-              return {};
-            }
-          });
+        const rawText = await presignRes
+          .clone()
+          .text()
+          .catch(() => "");
+        const raw: any = await presignRes.json().catch(() => {
+          try {
+            return rawText ? JSON.parse(rawText) : {};
+          } catch {
+            return {};
+          }
+        });
         // Robust extractor: handles single-object, arrays, maps, and various envelope keys
         const pickFirst = (...vals: any[]) =>
           vals.find((v) => v !== undefined && v !== null);
@@ -208,7 +209,9 @@ export default function UploadFormClient() {
         }
         // Fallback: arrays at root or envelopes
         if (presignsArr.length === 0) {
-          const arrayRoot = roots.find((r) => Array.isArray(r)) as any[] | undefined;
+          const arrayRoot = roots.find((r) => Array.isArray(r)) as
+            | any[]
+            | undefined;
           if (arrayRoot && arrayRoot.some((it) => looksLikePresign(it))) {
             presignsArr = arrayRoot.filter((it) => looksLikePresign(it));
           }
@@ -216,7 +219,10 @@ export default function UploadFormClient() {
         if (presignsArr.length === 0) {
           for (const k of ["data", "result", "payload"]) {
             const arr = (raw as any)?.[k];
-            if (Array.isArray(arr) && arr.some((it: any) => looksLikePresign(it))) {
+            if (
+              Array.isArray(arr) &&
+              arr.some((it: any) => looksLikePresign(it))
+            ) {
               presignsArr = arr.filter((it: any) => looksLikePresign(it));
               break;
             }
@@ -224,7 +230,9 @@ export default function UploadFormClient() {
         }
         if (!homeworkId || presignsArr.length === 0) {
           const snippet = (rawText || "").slice(0, 200);
-          throw new Error(`No presigns returned${snippet ? `: ${snippet}` : ""}`);
+          throw new Error(
+            `No presigns returned${snippet ? `: ${snippet}` : ""}`
+          );
         }
 
         // Upload to S3
@@ -241,7 +249,7 @@ export default function UploadFormClient() {
           })
         );
 
-        // Classify images/videos and write back
+        // Classify images/videos and write back (robust to single-file + varying keys)
         const imgExt = new Set([
           "jpg",
           "jpeg",
@@ -265,24 +273,60 @@ export default function UploadFormClient() {
         ]);
         const getExt = (name: string) =>
           (name.split(".").pop() || "").toLowerCase();
-        const isImg = (p: any) =>
-          (p?.contentType && String(p.contentType).startsWith("image/")) ||
-          imgExt.has(getExt(String(p.filename || "")));
-        const isVid = (p: any) =>
-          (p?.contentType && String(p.contentType).startsWith("video/")) ||
-          vidExt.has(getExt(String(p.filename || "")));
-        const urlOf = (p: any) =>
-          p?.fileUrl ||
-          p?.publicUrl ||
-          p?.location ||
-          p?.signedUrl ||
-          p?.presignedUrl ||
-          p?.url ||
-          p?.href ||
-          "";
+        const urlOf = (p: any) => {
+          const direct =
+            p?.fileUrl ||
+            p?.publicUrl ||
+            p?.location ||
+            p?.url ||
+            p?.href ||
+            "";
+          if (direct) return direct as string;
+          const up = p?.uploadUrl || p?.signedUrl || p?.presignedUrl || "";
+          if (typeof up === "string" && up) {
+            try {
+              const u = new URL(up);
+              return `${u.origin}${u.pathname}`; // strip query to form GET url
+            } catch {}
+          }
+          return "";
+        };
 
-        const images = presignsArr.filter(isImg).map(urlOf).filter(Boolean);
-        const videos = presignsArr.filter(isVid).map(urlOf).filter(Boolean);
+        // Pair presigns to original files (by name, else index)
+        const pairs = presignsArr.map((p: any, i: number) => {
+          const byName = files.find((x) => x.name === p.filename) || null;
+          const file = byName ?? files[i] ?? files[0] ?? null;
+          const nameForExt = String(p?.filename || file?.name || "");
+          const ctype = String(p?.contentType || file?.type || "");
+          const img =
+            (ctype && ctype.startsWith("image/")) ||
+            imgExt.has(getExt(nameForExt));
+          const vid =
+            (ctype && ctype.startsWith("video/")) ||
+            vidExt.has(getExt(nameForExt));
+          const finalUrl = urlOf(p);
+          return { p, file, img, vid, url: finalUrl };
+        });
+
+        let images = pairs
+          .filter((it) => it.img)
+          .map((it) => it.url)
+          .filter(Boolean);
+        let videos = pairs
+          .filter((it) => it.vid)
+          .map((it) => it.url)
+          .filter(Boolean);
+        // Last-resort fallback: single-file scenario
+        if (images.length === 0 && videos.length === 0 && pairs.length === 1) {
+          const only = pairs[0];
+          const url = only.url;
+          if (url) {
+            if (only.file?.type?.startsWith("image/")) images = [url];
+            else if (only.file?.type?.startsWith("video/")) videos = [url];
+            else if (imgExt.has(getExt(only.file?.name || ""))) images = [url];
+            else if (vidExt.has(getExt(only.file?.name || ""))) videos = [url];
+          }
+        }
 
         const writeRes = await fetch(
           `/api/homeworks/${encodeURIComponent(homeworkId)}`,
