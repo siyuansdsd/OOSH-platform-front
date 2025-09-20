@@ -13,6 +13,27 @@ import {
 
 const EN_NAME = /^[A-Za-z ]+$/;
 
+function FieldError({
+  message,
+  className = "",
+}: {
+  message?: string;
+  className?: string;
+}) {
+  const hasMessage = Boolean(message);
+  const content = hasMessage ? message : "\u00a0";
+  return (
+    <p
+      className={`text-xs ${
+        hasMessage ? "text-red-500" : "text-transparent"
+      } ${className}`}
+      style={{ minHeight: "1rem" }}
+    >
+      {content}
+    </p>
+  );
+}
+
 export default function UploadFormClient() {
   const [mode, setMode] = useState<UploadMode>("file");
   const [files, setFiles] = useState<File[]>([]);
@@ -446,20 +467,22 @@ export default function UploadFormClient() {
             </div>
           )}
 
-          {errors.files && (
-            <p className="-mt-4 mb-4 text-xs text-red-500">{errors.files}</p>
-          )}
-          {errors.urls && (
-            <p className="-mt-4 mb-4 text-xs text-red-500">{errors.urls}</p>
-          )}
+          <FieldError
+            message={errors.files}
+            className="-mt-4 mb-4"
+          />
+          <FieldError
+            message={errors.urls}
+            className="-mt-4 mb-4"
+          />
 
           <TraditionalFields />
 
-          {serverError ? (
-            <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-red-600">
-              {serverError}
-            </div>
-          ) : null}
+        {serverError ? (
+          <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-red-600">
+            {serverError}
+          </div>
+        ) : null}
 
           <div className="mt-6 flex items-center gap-3">
             <button
@@ -513,9 +536,7 @@ function TraditionalFields() {
           className={baseInput}
           placeholder="Enter project title"
         />
-        {errors.title && (
-          <p className="mt-1 text-xs text-red-500">{errors.title}</p>
-        )}
+        <FieldError message={errors.title} className="mt-1" />
       </label>
 
       <label className="block">
@@ -528,9 +549,7 @@ function TraditionalFields() {
           className={`${baseInput} min-h-[120px] resize-y`}
           placeholder="Describe the project"
         />
-        {errors.description && (
-          <p className="mt-1 text-xs text-red-500">{errors.description}</p>
-        )}
+        <FieldError message={errors.description} className="mt-1" />
       </label>
 
       <label className="block">
@@ -543,9 +562,7 @@ function TraditionalFields() {
           className={baseInput}
           placeholder="Enter school name (English only)"
         />
-        {errors.schoolName && (
-          <p className="mt-1 text-xs text-red-500">{errors.schoolName}</p>
-        )}
+        <FieldError message={errors.schoolName} className="mt-1" />
       </label>
 
       <div className="flex items-center gap-3">
@@ -565,18 +582,16 @@ function TraditionalFields() {
         <>
           <label className="block">
             <div className="mb-1 text-sm text-foreground/80">Team Name</div>
-            <input
-              value={groupName}
-              onChange={(e) => setGroupName(e.target.value)}
-              onBlur={(e) => setGroupName(e.target.value.trim())}
-              disabled={disabled}
-              className={baseInput}
-              placeholder="Enter team name (English only)"
-            />
-            {errors.groupName && (
-              <p className="mt-1 text-xs text-red-500">{errors.groupName}</p>
-            )}
-          </label>
+          <input
+            value={groupName}
+            onChange={(e) => setGroupName(e.target.value)}
+            onBlur={(e) => setGroupName(e.target.value.trim())}
+            disabled={disabled}
+            className={baseInput}
+            placeholder="Enter team name (English only)"
+          />
+          <FieldError message={errors.groupName} className="mt-1" />
+        </label>
           <div>
             <div className="mb-1 text-sm text-foreground/80">Members</div>
             <div className="flex flex-col gap-2">
@@ -620,16 +635,14 @@ function TraditionalFields() {
              >
                + Add member
              </button>
-              {errors.members && (
-                <p className="text-xs text-red-500">{errors.members}</p>
-              )}
-              {members.map((_, idx) =>
-                errors[`members_${idx}`] ? (
-                  <p key={idx} className="text-xs text-red-500">
-                    {errors[`members_${idx}`]}
-                  </p>
-                ) : null
-              )}
+              <FieldError message={errors.members} className="mt-1" />
+              {members.map((_, idx) => (
+                <FieldError
+                  key={idx}
+                  message={errors[`members_${idx}`]}
+                  className="mt-1"
+                />
+              ))}
             </div>
           </div>
         </>
@@ -644,9 +657,7 @@ function TraditionalFields() {
             className={baseInput}
             placeholder="Enter name (English only)"
           />
-          {errors.person_name && (
-            <p className="mt-1 text-xs text-red-500">{errors.person_name}</p>
-          )}
+          <FieldError message={errors.person_name} className="mt-1" />
         </label>
       )}
     </div>
