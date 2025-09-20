@@ -174,12 +174,12 @@ export function Gallery({
   return (
     <div className={`flex flex-col gap-6 ${className}`}>
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-        {gridItems.map((item) => {
+        {gridItems.map((item, index) => {
           const primaryName = item.groupName || item.personName || "Untitled";
           const multipleImages = item.images.length > 1;
           return (
             <article
-              key={item.id}
+              key={`${item.id}-${index}`}
               className="flex h-full flex-col overflow-hidden rounded-3xl border border-foreground/10 bg-white/5 p-4 backdrop-blur"
             >
               {renderMedia(item)}

@@ -37,25 +37,6 @@ export interface HomeworkListResult {
 
 const pick = <T,>(...vals: Array<T | undefined | null>): T | undefined =>
   vals.find((v) => v !== undefined && v !== null);
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  value !== null && typeof value === "object";
-
-const toUnknownArray = (input: unknown): unknown[] => {
-  if (input === null || input === undefined) return [];
-  if (Array.isArray(input)) return input;
-  if (isRecord(input)) return Object.values(input);
-  return [input];
-};
-
-const toStringArray = (value: unknown) =>
-  toUnknownArray(value)
-    .map((v) => String(v).trim())
-    .filter(Boolean);
-
-const getFromRecord = (
-  record: Record<string, unknown>,
-  keys: string[]
-): unknown => pick(...keys.map((key) => record[key]));
 
 const pickFromSources = (
   sources: Array<Record<string, unknown> | undefined>,
@@ -66,6 +47,85 @@ const pickFromSources = (
       source ? keys.map((key) => source[key]) : []
     )
   );
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  value !== null && typeof value === "object";
+
+const toUnknownArray = (input: unknown): unknown[] => {
+  if (input === null || input === undefined) return [];
+  if (Array.isArray(input)) return input;
+  return [input];
+};
+
+const looksLikeUrl = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return false;
+  if (/^(https?:)?\/\//i.test(trimmed)) return true;
+  if (/^data:/i.test(trimmed)) return true;
+  if (/^s3:\/\//i.test(trimmed)) return true;
+  if (trimmed.startsWith("/")) return true;
+  return false;
+};
+
+const findUrl = (value: unknown, depth = 0): string | undefined => {
+  if (typeof value === "string") {
+    return looksLikeUrl(value) ? value.trim() : undefined;
+  }
+  if (Array.isArray(value)) {
+    for (const entry of value) {
+      const url = findUrl(entry, depth + 1);
+      if (url) return url;
+    }
+    return undefined;
+  }
+  if (isRecord(value) && depth < 5) {
+    const direct = pickFromSources([value], [
+      "url",
+      "href",
+      "src",
+      "link",
+      "linkUrl",
+      "link_url",
+      "fileUrl",
+      "file_url",
+      "publicUrl",
+      "public_url",
+      "downloadUrl",
+      "download_url",
+      "videoUrl",
+      "video_url",
+      "signedUrl",
+      "signed_url",
+      "assetUrl",
+      "asset_url",
+      "path",
+    ]);
+    if (typeof direct === "string" && looksLikeUrl(direct)) {
+      return direct.trim();
+    }
+    for (const entry of Object.values(value)) {
+      const nested = findUrl(entry, depth + 1);
+      if (nested) return nested;
+    }
+  }
+  return undefined;
+};
+
+const toStringArray = (value: unknown) => {
+  const results: string[] = [];
+  for (const entry of toUnknownArray(value)) {
+    const url = findUrl(entry);
+    if (url) {
+      results.push(url);
+    }
+  }
+  return results;
+};
+
+const getFromRecord = (
+  record: Record<string, unknown>,
+  keys: string[]
+): unknown => pick(...keys.map((key) => record[key]));
 
 const toFiniteNumber = (value: unknown): number | undefined => {
   if (typeof value === "number" && Number.isFinite(value)) return value;
@@ -121,7 +181,7 @@ const normalizeItem = (item: unknown): HomeworkRecord | null => {
     getFromRecord(item, ["images", "image_urls", "photos"])
   );
   const videos = toStringArray(
-    getFromRecord(item, ["videos", "video_urls", "media"])
+    getFromRecord(item, ["videos", "video_urls", "media", "video"])
   );
   const urls = toStringArray(
     getFromRecord(item, ["urls", "links", "website", "websites"])
