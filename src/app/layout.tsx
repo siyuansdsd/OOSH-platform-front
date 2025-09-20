@@ -32,9 +32,15 @@ export default function RootLayout({
             <a href="/" className="font-semibold">
               MaxHacker
             </a>
-            <nav className="text-sm">
+            <nav className="flex items-center gap-3 text-sm">
               <a className="hover:underline" href="/upload">
                 Upload
+              </a>
+              <a
+                className="rounded-full border border-foreground/20 px-3 py-1 hover:border-foreground/40 hover:bg-foreground/5"
+                href="/login"
+              >
+                Log in
               </a>
             </nav>
           </div>

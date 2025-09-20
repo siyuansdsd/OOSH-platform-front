@@ -1,7 +1,8 @@
+import UploadFormClient from "@/components/upload/UploadFormClient";
+
 export const metadata = {
   title: "Upload",
 };
-import UploadFormClient from "@/components/upload/UploadFormClient";
 
 export default function UploadPage() {
   return (

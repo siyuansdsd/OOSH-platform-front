@@ -1,4 +1,53 @@
+import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
+
+function buildRemoteUrl(req: NextRequest, base: string) {
+  const incoming = new URL(req.url);
+  const target = new URL("/api/homeworks", base);
+  incoming.searchParams.forEach((value, key) => {
+    if (value !== undefined && value !== null) {
+      target.searchParams.append(key, value);
+    }
+  });
+  return target;
+}
+
+const errorMessage = (error: unknown) =>
+  error instanceof Error ? error.message : String(error ?? "");
+
+export async function GET(req: NextRequest) {
+  try {
+    const base = process.env.NEXT_PUBLIC_API_BASE ?? process.env.API_BASE;
+    if (!base) {
+      return NextResponse.json(
+        { message: "Server not configured (API_BASE)" },
+        { status: 500 },
+      );
+    }
+
+    const remoteUrl = buildRemoteUrl(req, base);
+    const res = await fetch(remoteUrl, {
+      method: "GET",
+      headers: {
+        accept: "application/json",
+      },
+      cache: "no-store",
+    });
+
+    const text = await res.text();
+    return new NextResponse(text, {
+      status: res.status,
+      headers: {
+        "content-type": res.headers.get("content-type") ?? "application/json",
+      },
+    });
+  } catch (error: unknown) {
+    return NextResponse.json(
+      { message: errorMessage(error) || "Proxy failed" },
+      { status: 500 },
+    );
+  }
+}
 
 export async function POST(req: Request) {
   try {
@@ -6,7 +55,7 @@ export async function POST(req: Request) {
     if (!base) {
       return NextResponse.json(
         { message: "Server not configured (API_BASE)" },
-        { status: 500 }
+        { status: 500 },
       );
     }
     const json = await req.json().catch(() => ({}));
@@ -22,10 +71,10 @@ export async function POST(req: Request) {
         "content-type": res.headers.get("content-type") ?? "application/json",
       },
     });
-  } catch (e: any) {
+  } catch (error: unknown) {
     return NextResponse.json(
-      { message: e?.message || "Proxy failed" },
-      { status: 500 }
+      { message: errorMessage(error) || "Proxy failed" },
+      { status: 500 },
     );
   }
 }
