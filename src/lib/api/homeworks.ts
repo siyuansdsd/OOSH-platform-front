@@ -12,6 +12,7 @@ export interface HomeworkRecord {
   images: string[];
   videos: string[];
   urls: string[];
+  members: string[];
   hasMedia: boolean;
   hasWebsite: boolean;
   raw?: unknown;
@@ -47,6 +48,11 @@ const pickFromSources = (
       source ? keys.map((key) => source[key]) : []
     )
   );
+
+const toTrimmedString = (value: unknown): string => {
+  if (value === null || value === undefined) return "";
+  return String(value).trim();
+};
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object";
@@ -122,6 +128,23 @@ const toStringArray = (value: unknown) => {
   return results;
 };
 
+const toPlainStringArray = (value: unknown) =>
+  toUnknownArray(value)
+    .map((entry) => {
+      if (typeof entry === "string") return entry.trim();
+      if (isRecord(entry)) {
+        const candidate = pickFromSources([entry], [
+          "name",
+          "value",
+          "label",
+          "text",
+        ]);
+        if (typeof candidate === "string") return candidate.trim();
+      }
+      return "";
+    })
+    .filter(Boolean);
+
 const getFromRecord = (
   record: Record<string, unknown>,
   keys: string[]
@@ -146,7 +169,7 @@ const normalizeItem = (item: unknown): HomeworkRecord | null => {
     "homework_id",
     "slug",
   ]);
-  const id = String(idRaw ?? "").trim();
+  const id = toTrimmedString(idRaw);
   if (!id) return null;
 
   const schoolRaw = getFromRecord(item, [
@@ -156,27 +179,41 @@ const normalizeItem = (item: unknown): HomeworkRecord | null => {
     "schoolname",
     "school_name_en",
   ]);
-  const schoolName = String(schoolRaw ?? "").trim() || "Unknown school";
+  const schoolName = toTrimmedString(schoolRaw) || "Unknown school";
 
-  const groupName = getFromRecord(item, ["groupName", "group_name", "team_name"]);
-  const personName = getFromRecord(item, [
+  const groupNameRaw = getFromRecord(item, [
+    "groupName",
+    "group_name",
+    "team_name",
+  ]);
+  const personNameRaw = getFromRecord(item, [
     "personName",
     "person_name",
     "student_name",
   ]);
-  const description = getFromRecord(item, [
+  const descriptionRaw = getFromRecord(item, [
     "description",
     "desc",
     "summary",
     "details",
   ]);
-  const title = getFromRecord(item, [
+  const titleRaw = getFromRecord(item, [
     "title",
     "name",
     "projectTitle",
     "project_title",
   ]);
-  const createdAt = getFromRecord(item, ["createdAt", "created_at", "createdOn"]);
+  const createdAtRaw = getFromRecord(item, [
+    "createdAt",
+    "created_at",
+    "createdOn",
+  ]);
+  const groupName = toTrimmedString(groupNameRaw);
+  const personName = toTrimmedString(personNameRaw);
+  const description = toTrimmedString(descriptionRaw);
+  const title = toTrimmedString(titleRaw);
+  const createdAt = toTrimmedString(createdAtRaw);
+
   const images = toStringArray(
     getFromRecord(item, ["images", "image_urls", "photos"])
   );
@@ -185,6 +222,15 @@ const normalizeItem = (item: unknown): HomeworkRecord | null => {
   );
   const urls = toStringArray(
     getFromRecord(item, ["urls", "links", "website", "websites"])
+  );
+  const members = toPlainStringArray(
+    getFromRecord(item, [
+      "members",
+      "teamMembers",
+      "team_members",
+      "memberNames",
+      "member_names",
+    ])
   );
 
   const hasMedia = images.length > 0 || videos.length > 0;
@@ -200,15 +246,16 @@ const normalizeItem = (item: unknown): HomeworkRecord | null => {
   return {
     id,
     schoolName,
-    groupName: groupName ? String(groupName) : undefined,
-    personName: personName ? String(personName) : undefined,
+    groupName: groupName || undefined,
+    personName: personName || undefined,
     isTeam: typeof isTeamRaw === "boolean" ? isTeamRaw : Boolean(isTeamRaw),
-    description: description ? String(description) : undefined,
-    title: title ? String(title) : undefined,
-    createdAt: createdAt ? String(createdAt) : undefined,
+    description: description || undefined,
+    title: title || undefined,
+    createdAt: createdAt || undefined,
     images,
     videos,
     urls,
+    members,
     hasMedia,
     hasWebsite,
     raw: item,

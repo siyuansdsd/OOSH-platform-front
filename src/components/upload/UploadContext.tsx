@@ -15,6 +15,10 @@ export interface UploadContextType {
   setUrls: (u: string[]) => void;
   schoolName: string;
   setSchoolName: (v: string) => void;
+  title: string;
+  setTitle: (v: string) => void;
+  description: string;
+  setDescription: (v: string) => void;
   groupName: string;
   setGroupName: (v: string) => void;
   is_team: boolean;

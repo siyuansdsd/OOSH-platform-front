@@ -15,9 +15,10 @@ interface GalleryProps {
 
 interface WebsitePreviewProps {
   url: string;
+  interactive?: boolean;
 }
 
-function WebsitePreview({ url }: WebsitePreviewProps) {
+function WebsitePreview({ url, interactive = true }: WebsitePreviewProps) {
   const [image, setImage] = useState<string>("");
   const [loading, setLoading] = useState(false);
 
@@ -61,9 +62,31 @@ function WebsitePreview({ url }: WebsitePreviewProps) {
   }
 
   if (!image) {
-    return (
+    const placeholder = (
       <div className="flex aspect-[4/3] items-center justify-center rounded-2xl bg-foreground/5 text-sm text-foreground/60">
         {loading ? "Fetching preview…" : "Preview unavailable"}
+      </div>
+    );
+    return interactive ? (
+      <a href={url} target="_blank" rel="noreferrer" className="block">
+        {placeholder}
+      </a>
+    ) : (
+      placeholder
+    );
+  }
+
+  if (!interactive) {
+    return (
+      <div className="relative aspect-[4/3] overflow-hidden rounded-2xl">
+        <img
+          src={image}
+          alt="Website preview"
+          className="h-full w-full object-cover"
+        />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-3 text-sm text-white">
+          Website preview
+        </div>
       </div>
     );
   }
@@ -97,13 +120,29 @@ export function Gallery({
   emptyState,
 }: GalleryProps) {
   const [modalItem, setModalItem] = useState<HomeworkRecord | null>(null);
-  const [initialImageIndex, setInitialImageIndex] = useState(0);
 
   const gridItems = useMemo(() => items ?? [], [items]);
 
+  const modalTitle = modalItem
+    ? modalItem.title || modalItem.groupName || modalItem.personName || "Project"
+    : "";
+  const modalStudents = modalItem
+    ? Array.from(
+        new Set(
+          [
+            ...(modalItem.members || []),
+            ...(modalItem.personName ? [modalItem.personName] : []),
+          ]
+        )
+      )
+    : [];
+
+  const openModal = (item: HomeworkRecord) => {
+    setModalItem(item);
+  };
+
   const closeModal = () => {
     setModalItem(null);
-    setInitialImageIndex(0);
   };
 
   const renderMedia = (item: HomeworkRecord) => {
@@ -113,27 +152,18 @@ export function Gallery({
 
     if (firstImage) {
       return (
-        <button
-          type="button"
-          className={`group relative aspect-[4/3] w-full overflow-hidden rounded-2xl ${multipleImages ? "cursor-pointer" : "cursor-default"}`}
-          onClick={() => {
-            if (multipleImages) {
-              setModalItem(item);
-              setInitialImageIndex(0);
-            }
-          }}
-        >
+        <div className="group relative aspect-[4/3] w-full overflow-hidden rounded-2xl">
           <img
             src={firstImage}
             alt={item.title || item.groupName || item.personName || "Project image"}
             className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
           />
           {multipleImages ? (
-            <div className="absolute right-3 top-3 rounded-full bg-black/70 px-3 py-1 text-xs font-semibold text-white">
+            <div className="pointer-events-none absolute right-3 top-3 rounded-full bg-black/70 px-3 py-1 text-xs font-semibold text-white">
               +{item.images.length - 1} more
             </div>
           ) : null}
-        </button>
+        </div>
       );
     }
 
@@ -141,19 +171,25 @@ export function Gallery({
       return (
         <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-black">
           <video
-            controls
-            preload="metadata"
             className="h-full w-full object-cover"
             src={firstVideo}
+            controls={false}
+            preload="metadata"
+            loop
+            muted
+            playsInline
           >
             Your browser does not support the video tag.
           </video>
+          <div className="pointer-events-none absolute left-3 top-3 rounded-full bg-black/70 px-3 py-1 text-xs font-semibold text-white">
+            Video preview
+          </div>
         </div>
       );
     }
 
     if (item.hasWebsite && item.urls[0]) {
-      return <WebsitePreview url={item.urls[0]} />;
+      return <WebsitePreview url={item.urls[0]} interactive={false} />;
     }
 
     return (
@@ -175,27 +211,27 @@ export function Gallery({
     <div className={`flex flex-col gap-6 ${className}`}>
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
         {gridItems.map((item, index) => {
-          const primaryName = item.groupName || item.personName || "Untitled";
-          const multipleImages = item.images.length > 1;
+          const cardTitle =
+            item.title || item.groupName || item.personName || "Untitled project";
           return (
             <article
               key={`${item.id}-${index}`}
-              className="flex h-full flex-col overflow-hidden rounded-3xl border border-foreground/10 bg-white/5 p-4 backdrop-blur"
+              role="button"
+              tabIndex={0}
+              onClick={() => openModal(item)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  openModal(item);
+                }
+              }}
+              className="flex h-full cursor-pointer flex-col overflow-hidden rounded-3xl border border-foreground/10 bg-white/5 p-4 backdrop-blur transition duration-200 hover:-translate-y-1 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40"
             >
               {renderMedia(item)}
-              <div className="mt-4 flex flex-1 flex-col">
-                <div className="text-sm font-semibold text-foreground">
-                  {item.title || primaryName}
-                </div>
-                <div className="mt-1 text-sm text-foreground/70">
-                  {primaryName}
-                </div>
-                <div className="text-xs text-foreground/60">{item.schoolName}</div>
-                {item.description && !multipleImages ? (
-                  <p className="mt-3 line-clamp-3 text-sm text-foreground/70">
-                    {item.description}
-                  </p>
-                ) : null}
+              <div className="mt-4">
+                <h3 className="text-base font-semibold text-foreground">
+                  {cardTitle}
+                </h3>
               </div>
             </article>
           );
@@ -225,7 +261,7 @@ export function Gallery({
             onClick={closeModal}
             aria-hidden="true"
           />
-          <div className="relative z-10 max-h-[90vh] w-[min(90vw,900px)] overflow-y-auto rounded-3xl bg-background p-6 text-foreground shadow-2xl">
+          <div className="relative z-10 max-h-[90vh] w-[min(90vw,960px)] overflow-y-auto rounded-3xl bg-background p-6 text-foreground shadow-2xl">
             <button
               type="button"
               onClick={closeModal}
@@ -234,29 +270,79 @@ export function Gallery({
             >
               ×
             </button>
-            <div className="flex flex-col gap-4">
-              <header>
-                <h2 className="text-xl font-semibold text-foreground">
-                  {modalItem.title || modalItem.groupName || modalItem.personName || "Project"}
-                </h2>
-                <p className="text-sm text-foreground/70">{modalItem.schoolName}</p>
+            <div className="flex flex-col gap-6">
+              <header className="space-y-3">
+                <span className="text-xs uppercase tracking-wide text-foreground/50">
+                  Project overview
+                </span>
+                <h2 className="text-2xl font-semibold text-foreground">{modalTitle}</h2>
+                <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-foreground/70">
+                  <div>
+                    <span className="font-medium text-foreground">School:</span> {modalItem.schoolName}
+                  </div>
+                  {modalItem.groupName ? (
+                    <div>
+                      <span className="font-medium text-foreground">Team:</span> {modalItem.groupName}
+                    </div>
+                  ) : null}
+                  {modalStudents.length > 0 ? (
+                    <div>
+                      <span className="font-medium text-foreground">Students:</span> {modalStudents.join(", ")}
+                    </div>
+                  ) : null}
+                </div>
               </header>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                {modalItem.images.map((image, index) => (
-                  <img
-                    key={image}
-                    src={image}
-                    alt={`Image ${index + 1}`}
-                    className={`w-full rounded-2xl object-cover ${
-                      index === initialImageIndex ? "ring-2 ring-foreground/60" : ""
-                    }`}
-                  />
-                ))}
-              </div>
+
               {modalItem.description ? (
-                <p className="text-sm leading-relaxed text-foreground/75">
+                <p className="rounded-2xl bg-foreground/5 p-4 text-sm leading-relaxed text-foreground/80">
                   {modalItem.description}
                 </p>
+              ) : null}
+
+              {modalItem.images.length > 0 ? (
+                <section className="space-y-3">
+                  <h3 className="text-sm font-semibold text-foreground">Images</h3>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {modalItem.images.map((image) => (
+                      <img
+                        key={image}
+                        src={image}
+                        alt={modalTitle}
+                        className="w-full rounded-2xl object-cover"
+                      />
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              {modalItem.videos.length > 0 ? (
+                <section className="space-y-3">
+                  <h3 className="text-sm font-semibold text-foreground">Videos</h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    {modalItem.videos.map((video) => (
+                      <video
+                        key={video}
+                        src={video}
+                        controls
+                        playsInline
+                        className="w-full overflow-hidden rounded-2xl"
+                      >
+                        Your browser does not support the video tag.
+                      </video>
+                    ))}
+                  </div>
+                </section>
+              ) : null}
+
+              {modalItem.urls.length > 0 ? (
+                <section className="space-y-3">
+                  <h3 className="text-sm font-semibold text-foreground">Websites</h3>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {modalItem.urls.map((url) => (
+                      <WebsitePreview key={url} url={url} />
+                    ))}
+                  </div>
+                </section>
               ) : null}
             </div>
           </div>

@@ -18,6 +18,8 @@ export default function UploadFormClient() {
   const [files, setFiles] = useState<File[]>([]);
   const [urls, setUrls] = useState<string[]>([""]);
   const [schoolName, setSchoolName] = useState("");
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
   const [groupName, setGroupName] = useState("");
   const [is_team, setIsTeam] = useState(false);
   const [members, setMembers] = useState<string[]>([""]);
@@ -37,6 +39,10 @@ export default function UploadFormClient() {
       setUrls,
       schoolName,
       setSchoolName,
+      title,
+      setTitle,
+      description,
+      setDescription,
       groupName,
       setGroupName,
       is_team,
@@ -54,6 +60,8 @@ export default function UploadFormClient() {
       files,
       urls,
       schoolName,
+      title,
+      description,
       groupName,
       is_team,
       members,
@@ -66,11 +74,14 @@ export default function UploadFormClient() {
   const validate = (): boolean => {
     const e: ValidationErrors = {};
     const check = (key: string, val: string, label: string) => {
-      if (!val) e[key] = `${label} is required`;
-      else if (!EN_NAME.test(val))
+      const trimmed = val.trim();
+      if (!trimmed) e[key] = `${label} is required`;
+      else if (!EN_NAME.test(trimmed))
         e[key] = `${label} must be English letters and spaces only`;
     };
     check("schoolName", schoolName, "School Name");
+    if (!title.trim()) e.title = "Title is required";
+    if (!description.trim()) e.description = "Description is required";
 
     if (mode === "file") {
       if (!files.length) e.files = "Please add at least one image or video";
@@ -81,12 +92,17 @@ export default function UploadFormClient() {
 
     if (is_team) {
       check("groupName", groupName, "Team Name");
-      members.forEach((m, idx) => {
-        if (!m) e[`members_${idx}`] = `Member ${idx + 1} is required`;
-        else if (!EN_NAME.test(m))
+      const trimmedMembers = members.map((m) => m.trim());
+      const filledMembers = trimmedMembers.filter(Boolean);
+      if (filledMembers.length === 0) {
+        e.members = "Please provide at least one team member name";
+      }
+      trimmedMembers.forEach((m, idx) => {
+        if (m && !EN_NAME.test(m)) {
           e[`members_${idx}`] = `Member ${
             idx + 1
           } must be English letters and spaces only`;
+        }
       });
     } else {
       check("person_name", person_name, "Person Name");
@@ -102,15 +118,18 @@ export default function UploadFormClient() {
     try {
       if (mode === "file") {
         // Presign JSON flow: request presigns -> PUT to S3 -> write-back
+        const trimmedMembers = members.map((m) => m.trim()).filter(Boolean);
         const presignReq = {
           files: files.map((f) => ({ filename: f.name, contentType: f.type })),
-          schoolName,
-          groupName: is_team ? groupName : undefined,
+          schoolName: schoolName.trim(),
+          title: title.trim(),
+          description: description.trim(),
+          groupName: is_team ? groupName.trim() : undefined,
           is_team,
-          members: is_team ? members : undefined,
-          person_name: !is_team ? person_name : undefined,
+          members: is_team ? trimmedMembers : undefined,
+          person_name: !is_team ? person_name.trim() : undefined,
           mode,
-        } as any;
+        } as const;
 
         const presignRes = await fetch("/api/uploads/create-and-presign", {
           method: "POST",
@@ -333,7 +352,17 @@ export default function UploadFormClient() {
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ images, videos }),
+            body: JSON.stringify({
+              images,
+              videos,
+              title: title.trim(),
+              description: description.trim(),
+              school_name: schoolName.trim(),
+              group_name: is_team ? groupName.trim() : undefined,
+              person_name: !is_team ? person_name.trim() : undefined,
+              is_team,
+              members: is_team ? trimmedMembers : undefined,
+            }),
           }
         );
         if (!writeRes.ok) {
@@ -348,12 +377,15 @@ export default function UploadFormClient() {
       } else {
         // URL-only flow: direct POST
         const cleaned = urls.map((u) => u.trim()).filter(Boolean);
+        const trimmedMembers = members.map((m) => m.trim()).filter(Boolean);
         const payload = {
-          school_name: schoolName,
+          school_name: schoolName.trim(),
           is_team,
-          person_name: !is_team ? person_name : undefined,
-          group_name: is_team ? groupName : undefined,
-          members: is_team ? members : undefined,
+          title: title.trim(),
+          description: description.trim(),
+          person_name: !is_team ? person_name.trim() : undefined,
+          group_name: is_team ? groupName.trim() : undefined,
+          members: is_team ? trimmedMembers : undefined,
           urls: cleaned,
         };
         const res = await fetch("/api/homeworks", {
@@ -450,6 +482,10 @@ function TraditionalFields() {
   const {
     schoolName,
     setSchoolName,
+    title,
+    setTitle,
+    description,
+    setDescription,
     groupName,
     setGroupName,
     is_team,
@@ -467,6 +503,36 @@ function TraditionalFields() {
 
   return (
     <div className="grid grid-cols-1 gap-4">
+      <label className="block">
+        <div className="mb-1 text-sm text-foreground/80">Project Title</div>
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onBlur={(e) => setTitle(e.target.value.trim())}
+          disabled={disabled}
+          className={baseInput}
+          placeholder="Enter project title"
+        />
+        {errors.title && (
+          <p className="mt-1 text-xs text-red-500">{errors.title}</p>
+        )}
+      </label>
+
+      <label className="block">
+        <div className="mb-1 text-sm text-foreground/80">Project Description</div>
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          onBlur={(e) => setDescription(e.target.value.trim())}
+          disabled={disabled}
+          className={`${baseInput} min-h-[120px] resize-y`}
+          placeholder="Describe the project"
+        />
+        {errors.description && (
+          <p className="mt-1 text-xs text-red-500">{errors.description}</p>
+        )}
+      </label>
+
       <label className="block">
         <div className="mb-1 text-sm text-foreground/80">School Name</div>
         <input
@@ -547,13 +613,16 @@ function TraditionalFields() {
                   )}
                 </div>
               ))}
-              <button
-                type="button"
-                onClick={() => setMembers([...members, ""])}
-                className="h-10 w-fit rounded-xl bg-blue-600 px-4 text-white text-sm font-medium shadow-lg shadow-blue-600/20"
-              >
-                + Add member
-              </button>
+             <button
+               type="button"
+               onClick={() => setMembers([...members, ""])}
+               className="h-10 w-fit rounded-xl bg-blue-600 px-4 text-white text-sm font-medium shadow-lg shadow-blue-600/20"
+             >
+               + Add member
+             </button>
+              {errors.members && (
+                <p className="text-xs text-red-500">{errors.members}</p>
+              )}
               {members.map((_, idx) =>
                 errors[`members_${idx}`] ? (
                   <p key={idx} className="text-xs text-red-500">
