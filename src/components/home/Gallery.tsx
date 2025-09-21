@@ -62,17 +62,23 @@ function WebsitePreview({ url, interactive = true }: WebsitePreviewProps) {
   }
 
   if (!image) {
-    const placeholder = (
-      <div className="flex aspect-[4/3] items-center justify-center rounded-2xl bg-foreground/5 text-sm text-foreground/60">
-        {loading ? "Fetching preview…" : "Preview unavailable"}
+    const frame = (
+      <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-foreground/5">
+        <iframe
+          src={url}
+          loading="lazy"
+          sandbox="allow-scripts allow-same-origin allow-popups"
+          className="pointer-events-none h-full w-full scale-110 origin-top-left"
+          title="Website preview"
+        />
       </div>
     );
     return interactive ? (
       <a href={url} target="_blank" rel="noreferrer" className="block">
-        {placeholder}
+        {frame}
       </a>
     ) : (
-      placeholder
+      frame
     );
   }
 
@@ -84,9 +90,6 @@ function WebsitePreview({ url, interactive = true }: WebsitePreviewProps) {
           alt="Website preview"
           className="h-full w-full object-cover"
         />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-3 text-sm text-white">
-          Website preview
-        </div>
       </div>
     );
   }
@@ -151,20 +154,25 @@ export function Gallery({
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const badges: string[] = [];
+    const badges: Array<{ label: string; variant: "video" | "image" }> = [];
     if (videoCount > 0) {
       if (videoCount - 1 > 0) {
-        badges.push(
-          `+${videoCount - 1} more video${videoCount - 1 > 1 ? "s" : ""}`
-        );
+        badges.push({
+          label: `+${videoCount - 1} more video${videoCount - 1 > 1 ? "s" : ""}`,
+          variant: "video",
+        });
       }
       if (imageCount > 0) {
-        badges.push(
-          `+${imageCount} image${imageCount > 1 ? "s" : ""}`
-        );
+        badges.push({
+          label: `+${imageCount} image${imageCount > 1 ? "s" : ""}`,
+          variant: "image",
+        });
       }
     } else if (imageCount > 1) {
-      badges.push(`+${imageCount - 1} more image${imageCount - 1 > 1 ? "s" : ""}`);
+      badges.push({
+        label: `+${imageCount - 1} more image${imageCount - 1 > 1 ? "s" : ""}`,
+        variant: "image",
+      });
     }
 
     const clearTimer = () => {
@@ -222,12 +230,16 @@ export function Gallery({
           </video>
           {badges.length > 0 ? (
             <div className="pointer-events-none absolute right-3 top-3 flex flex-col items-end gap-1 text-xs font-semibold text-white">
-              {badges.map((label) => (
+              {badges.map((badge) => (
                 <span
-                  key={label}
-                  className="rounded-full bg-black/70 px-3 py-1"
+                  key={badge.label}
+                  className={`rounded-full px-3 py-1 ${
+                    badge.variant === "video"
+                      ? "bg-sky-500/80"
+                      : "bg-orange-500/80"
+                  }`}
                 >
-                  {label}
+                  {badge.label}
                 </span>
               ))}
             </div>
@@ -246,12 +258,16 @@ export function Gallery({
           />
           {badges.length > 0 ? (
             <div className="pointer-events-none absolute right-3 top-3 flex flex-col items-end gap-1 text-xs font-semibold text-white">
-              {badges.map((label) => (
+              {badges.map((badge) => (
                 <span
-                  key={label}
-                  className="rounded-full bg-black/70 px-3 py-1"
+                  key={badge.label}
+                  className={`rounded-full px-3 py-1 ${
+                    badge.variant === "video"
+                      ? "bg-sky-500/80"
+                      : "bg-orange-500/80"
+                  }`}
                 >
-                  {label}
+                  {badge.label}
                 </span>
               ))}
             </div>
