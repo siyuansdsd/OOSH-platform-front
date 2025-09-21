@@ -61,14 +61,23 @@ function WebsitePreview({ url, interactive = true }: WebsitePreviewProps) {
     );
   }
 
-  if (!image) {
+  const looksLikeIcon = (href: string) => /favicon|icon|logo/i.test(href);
+
+  if (!image || looksLikeIcon(image)) {
     const frame = (
       <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-foreground/5">
         <iframe
           src={url}
           loading="lazy"
           sandbox="allow-scripts allow-same-origin allow-popups"
-          className="pointer-events-none h-full w-full scale-110 origin-top-left"
+          scrolling="no"
+          className="pointer-events-none absolute inset-0 border-0"
+          style={{
+            width: "166%",
+            height: "166%",
+            transform: "scale(0.6)",
+            transformOrigin: "top left",
+          }}
           title="Website preview"
         />
       </div>
@@ -158,19 +167,22 @@ export function Gallery({
     if (videoCount > 0) {
       if (videoCount - 1 > 0) {
         badges.push({
-          label: `+${videoCount - 1} more video${videoCount - 1 > 1 ? "s" : ""}`,
+          label:
+            videoCount - 1 === 1 ? "+1 more video" : `+${videoCount - 1} more videos`,
           variant: "video",
         });
       }
       if (imageCount > 0) {
         badges.push({
-          label: `+${imageCount} image${imageCount > 1 ? "s" : ""}`,
+          label:
+            imageCount === 1 ? "+1 more image" : `+${imageCount} more images`,
           variant: "image",
         });
       }
     } else if (imageCount > 1) {
+      const remaining = imageCount - 1;
       badges.push({
-        label: `+${imageCount - 1} more image${imageCount - 1 > 1 ? "s" : ""}`,
+        label: remaining === 1 ? "+1 more image" : `+${remaining} more images`,
         variant: "image",
       });
     }
@@ -229,11 +241,11 @@ export function Gallery({
             Your browser does not support the video tag.
           </video>
           {badges.length > 0 ? (
-            <div className="pointer-events-none absolute right-3 top-3 flex flex-col items-end gap-1 text-xs font-semibold text-white">
+            <div className="pointer-events-none absolute right-3 top-3 flex w-32 flex-col items-end gap-1 text-xs font-semibold text-white">
               {badges.map((badge) => (
                 <span
                   key={badge.label}
-                  className={`rounded-full px-3 py-1 ${
+                  className={`inline-flex w-full justify-center rounded-full px-3 py-1 ${
                     badge.variant === "video"
                       ? "bg-sky-500/80"
                       : "bg-orange-500/80"
@@ -257,11 +269,11 @@ export function Gallery({
             className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
           />
           {badges.length > 0 ? (
-            <div className="pointer-events-none absolute right-3 top-3 flex flex-col items-end gap-1 text-xs font-semibold text-white">
+            <div className="pointer-events-none absolute right-3 top-3 flex w-32 flex-col items-end gap-1 text-xs font-semibold text-white">
               {badges.map((badge) => (
                 <span
                   key={badge.label}
-                  className={`rounded-full px-3 py-1 ${
+                  className={`inline-flex w-full justify-center rounded-full px-3 py-1 ${
                     badge.variant === "video"
                       ? "bg-sky-500/80"
                       : "bg-orange-500/80"

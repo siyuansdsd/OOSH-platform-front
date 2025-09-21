@@ -99,6 +99,8 @@ export default function UrlUploader() {
     }, 500);
   };
 
+  const looksLikeIcon = (href: string) => /favicon|icon|logo/i.test(href);
+
   const fetchPreview = async (idx: number, u: string) => {
     if (!u) return;
     if (isImageUrl(u)) {
@@ -155,31 +157,60 @@ export default function UrlUploader() {
               />
             </label>
             {u ? (
-              <div className="mt-3 overflow-hidden rounded-lg border border-foreground/10 bg-white min-h-12 flex items-center justify-center">
-                {loadingIdx === idx ? (
-                  <span className="text-xs text-foreground/60">
-                    Loading preview...
-                  </span>
-                ) : previews[idx] ? (
-                  <img
-                    src={previews[idx]}
-                    className="w-full h-40 object-cover"
-                    alt={u}
-                  />
-                ) : isImageUrl(u) ? (
-                  <img src={u} className="w-full h-40 object-cover" alt={u} />
-                ) : (
-                  <span className="text-xs text-foreground/70">
-                    {(() => {
-                      try {
-                        const d = new URL(u).hostname.replace(/^www\./, "");
-                        return d;
-                      } catch {
-                        return u;
-                      }
-                    })()}
-                  </span>
-                )}
+              <div className="mt-3 overflow-hidden rounded-lg border border-foreground/10 bg-white/40">
+                <div className="relative aspect-[4/3] w-full">
+                  {loadingIdx === idx ? (
+                    <span className="absolute inset-0 flex items-center justify-center text-xs text-foreground/60">
+                      Loading preview...
+                    </span>
+                  ) : (() => {
+                    const trimmed = u.trim();
+                    const directImage = isImageUrl(trimmed) ? trimmed : "";
+                    const previewImage = previews[idx];
+                    const imageToShow = previewImage || directImage;
+                    if (imageToShow && !looksLikeIcon(imageToShow)) {
+                      return (
+                        <img
+                          src={imageToShow}
+                          className="absolute inset-0 h-full w-full object-cover"
+                          alt={u}
+                        />
+                      );
+                    }
+                    if (!trimmed) {
+                      return (
+                        <span className="absolute inset-0 flex items-center justify-center text-xs text-foreground/60">
+                          Enter a URL to preview
+                        </span>
+                      );
+                    }
+                    try {
+                      const hostname = new URL(trimmed).hostname.replace(/^www\./, "");
+                      return (
+                        <iframe
+                          src={trimmed}
+                          loading="lazy"
+                          sandbox="allow-scripts allow-same-origin allow-popups"
+                          scrolling="no"
+                          className="pointer-events-none absolute inset-0 border-0"
+                          style={{
+                            width: "166%",
+                            height: "166%",
+                            transform: "scale(0.6)",
+                            transformOrigin: "top left",
+                          }}
+                          title={hostname || "Website preview"}
+                        />
+                      );
+                    } catch {
+                      return (
+                        <span className="absolute inset-0 flex items-center justify-center text-xs text-foreground/70">
+                          {trimmed}
+                        </span>
+                      );
+                    }
+                  })()}
+                </div>
               </div>
             ) : null}
           </div>
