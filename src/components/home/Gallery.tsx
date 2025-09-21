@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { HomeworkRecord } from "@/lib/api/homeworks";
 
 interface GalleryProps {
@@ -145,45 +145,117 @@ export function Gallery({
     setModalItem(null);
   };
 
-  const renderMedia = (item: HomeworkRecord) => {
-    const firstImage = item.images[0];
-    const multipleImages = item.images.length > 1;
-    const firstVideo = item.videos[0];
+  const CardMedia = ({ item }: { item: HomeworkRecord }) => {
+    const videoCount = item.videos.length;
+    const imageCount = item.images.length;
+    const videoRef = useRef<HTMLVideoElement | null>(null);
+    const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    if (firstImage) {
+    const badges: string[] = [];
+    if (videoCount > 0) {
+      if (videoCount - 1 > 0) {
+        badges.push(
+          `+${videoCount - 1} more video${videoCount - 1 > 1 ? "s" : ""}`
+        );
+      }
+      if (imageCount > 0) {
+        badges.push(
+          `+${imageCount} image${imageCount > 1 ? "s" : ""}`
+        );
+      }
+    } else if (imageCount > 1) {
+      badges.push(`+${imageCount - 1} more image${imageCount - 1 > 1 ? "s" : ""}`);
+    }
+
+    const clearTimer = () => {
+      if (hoverTimer.current) {
+        clearTimeout(hoverTimer.current);
+        hoverTimer.current = null;
+      }
+    };
+
+    const stopVideo = () => {
+      clearTimer();
+      const videoEl = videoRef.current;
+      if (videoEl) {
+        videoEl.pause();
+        try {
+          videoEl.currentTime = 0;
+        } catch {}
+      }
+    };
+
+    const schedulePlay = () => {
+      if (videoCount === 0) return;
+      clearTimer();
+      hoverTimer.current = setTimeout(() => {
+        const videoEl = videoRef.current;
+        if (videoEl) {
+          videoEl.play().catch(() => {});
+        }
+      }, 900);
+    };
+
+    useEffect(() => () => stopVideo(), []);
+
+    if (videoCount > 0) {
       return (
-        <div className="group relative aspect-[4/3] w-full overflow-hidden rounded-2xl">
-          <img
-            src={firstImage}
-            alt={item.title || item.groupName || item.personName || "Project image"}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-          />
-          {multipleImages ? (
-            <div className="pointer-events-none absolute right-3 top-3 rounded-full bg-black/70 px-3 py-1 text-xs font-semibold text-white">
-              +{item.images.length - 1} more
+        <div
+          className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-black"
+          onMouseEnter={schedulePlay}
+          onMouseLeave={stopVideo}
+          onTouchStart={schedulePlay}
+          onTouchEnd={stopVideo}
+          onTouchCancel={stopVideo}
+        >
+          <video
+            ref={videoRef}
+            className="h-full w-full object-cover"
+            src={item.videos[0]}
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            controls={false}
+          >
+            Your browser does not support the video tag.
+          </video>
+          {badges.length > 0 ? (
+            <div className="pointer-events-none absolute right-3 top-3 flex flex-col items-end gap-1 text-xs font-semibold text-white">
+              {badges.map((label) => (
+                <span
+                  key={label}
+                  className="rounded-full bg-black/70 px-3 py-1"
+                >
+                  {label}
+                </span>
+              ))}
             </div>
           ) : null}
         </div>
       );
     }
 
-    if (firstVideo) {
+    if (imageCount > 0) {
       return (
-        <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-black">
-          <video
-            className="h-full w-full object-cover"
-            src={firstVideo}
-            controls={false}
-            preload="metadata"
-            loop
-            muted
-            playsInline
-          >
-            Your browser does not support the video tag.
-          </video>
-          <div className="pointer-events-none absolute left-3 top-3 rounded-full bg-black/70 px-3 py-1 text-xs font-semibold text-white">
-            Video preview
-          </div>
+        <div className="group relative aspect-[4/3] w-full overflow-hidden rounded-2xl">
+          <img
+            src={item.images[0]}
+            alt={item.title || item.groupName || item.personName || "Project image"}
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+          />
+          {badges.length > 0 ? (
+            <div className="pointer-events-none absolute right-3 top-3 flex flex-col items-end gap-1 text-xs font-semibold text-white">
+              {badges.map((label) => (
+                <span
+                  key={label}
+                  className="rounded-full bg-black/70 px-3 py-1"
+                >
+                  {label}
+                </span>
+              ))}
+            </div>
+          ) : null}
         </div>
       );
     }
@@ -227,7 +299,7 @@ export function Gallery({
               }}
               className="flex h-full cursor-pointer flex-col overflow-hidden rounded-3xl border border-foreground/10 bg-white/5 p-4 backdrop-blur transition duration-200 hover:-translate-y-1 hover:shadow-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-foreground/40"
             >
-              {renderMedia(item)}
+              <CardMedia item={item} />
               <div className="mt-4">
                 <h3 className="text-base font-semibold text-foreground">
                   {cardTitle}
