@@ -158,7 +158,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     const resp = await (isAdmin
       ? loginAdmin(email, password || "")
-      : loginUser({ username: email, code }));
+      : loginUser({ email, code }));
     setFromResponse(resp);
   };
 
@@ -174,7 +174,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const loginWithPassword = async ({ email, password }: { email: string; password: string }) => {
-    const resp = await loginUser({ username: email.trim(), password });
+    const resp = await loginUser({ email: email.trim(), password });
     setFromResponse(resp);
   };
 

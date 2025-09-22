@@ -79,7 +79,7 @@ export async function verifyCode(
 }
 
 export async function loginUser(params: {
-  username: string;
+  email: string;
   password?: string;
   code?: string;
 }) {
@@ -89,7 +89,7 @@ export async function loginUser(params: {
     body: JSON.stringify(
       Object.fromEntries(
         Object.entries({
-          username: params.username,
+          email: params.email,
           password: params.password,
           code: params.code,
         }).filter(([, value]) => value !== undefined && value !== "")
