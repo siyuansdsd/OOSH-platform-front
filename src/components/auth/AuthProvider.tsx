@@ -21,7 +21,7 @@ interface AuthContextValue {
   refreshToken: string | null;
   scope: string | null;
   loading: boolean;
-  sendCode: (email: string, password?: string) => Promise<void>;
+  sendCode: (email: string, options?: { password?: string; purpose?: "register" | "login" }) => Promise<void>;
   login: (options: { email: string; password?: string; code: string; isAdmin?: boolean }) => Promise<void>;
   loginWithPassword: (options: { email: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
@@ -134,8 +134,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const sendCode = async (email: string, password?: string, purpose?: "register" | "login") => {
-    await sendVerificationCode(email, { password, purpose });
+  const sendCode = async (
+    email: string,
+    options?: { password?: string; purpose?: "register" | "login" }
+  ) => {
+    await sendVerificationCode(email, options);
   };
 
   const login = async ({
