@@ -28,7 +28,7 @@ export function RegisterForm() {
     setMessage(null);
     setSendingCode(true);
     try {
-      await sendCode(email.trim());
+      await sendCode(email.trim(), undefined, "register");
       setMessage("Verification code sent. It expires in 5 minutes.");
     } catch {
       setMessage("Email verification failed.");

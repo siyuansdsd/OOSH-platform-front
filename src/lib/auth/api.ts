@@ -30,12 +30,21 @@ export interface RegisterInput {
 
 const jsonHeaders = { "content-type": "application/json" } as const;
 
-export async function sendVerificationCode(email: string, password?: string) {
+export async function sendVerificationCode(
+  email: string,
+  options?: { password?: string; purpose?: "register" | "login" }
+) {
   const res = await fetch("/api/verify/send-code", {
     method: "POST",
     headers: jsonHeaders,
     body: JSON.stringify(
-      password ? { email, password } : { email }
+      Object.fromEntries(
+        Object.entries({
+          email,
+          password: options?.password,
+          purpose: options?.purpose,
+        }).filter(([, value]) => value !== undefined)
+      )
     ),
   });
   if (!res.ok) {
@@ -46,14 +55,21 @@ export async function sendVerificationCode(email: string, password?: string) {
 
 export async function verifyCode(
   email: string,
-  password: string | undefined,
-  code: string
+  code: string,
+  options?: { password?: string; purpose?: "register" | "login" }
 ) {
   const res = await fetch("/api/verify/verify-code", {
     method: "POST",
     headers: jsonHeaders,
     body: JSON.stringify(
-      password ? { email, password, code } : { email, code }
+      Object.fromEntries(
+        Object.entries({
+          email,
+          code,
+          password: options?.password,
+          purpose: options?.purpose,
+        }).filter(([, value]) => value !== undefined)
+      )
     ),
   });
   if (!res.ok) {

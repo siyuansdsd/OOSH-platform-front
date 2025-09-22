@@ -134,8 +134,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const sendCode = async (email: string, password?: string) => {
-    await sendVerificationCode(email, password);
+  const sendCode = async (email: string, password?: string, purpose?: "register" | "login") => {
+    await sendVerificationCode(email, { password, purpose });
   };
 
   const login = async ({
@@ -149,7 +149,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     code: string;
     isAdmin?: boolean;
   }) => {
-    await verifyCode(email, isAdmin ? password : undefined, code);
+    await verifyCode(email, code, {
+      password: isAdmin ? password : undefined,
+      purpose: "login",
+    });
     const resp = await (isAdmin
       ? loginAdmin(email, password || "")
       : loginUser({ username: email, code }));
