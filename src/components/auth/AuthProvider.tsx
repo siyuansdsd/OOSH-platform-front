@@ -23,7 +23,7 @@ interface AuthContextValue {
   loading: boolean;
   sendCode: (email: string, options?: { password?: string; purpose?: "register" | "login" }) => Promise<void>;
   login: (options: { email: string; password?: string; code: string; isAdmin?: boolean }) => Promise<void>;
-  loginWithPassword: (options: { email: string; password: string }) => Promise<void>;
+  loginWithPassword: (options: { username: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
 }
@@ -156,7 +156,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       password: isAdmin ? password : undefined,
     });
     const resp = await (isAdmin
-      ? loginAdmin(email, password || "")
+      ? loginAdmin(email, password || "", code)
       : loginUser({ email, code }));
     setFromResponse(resp);
   };
@@ -172,8 +172,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setSession(null);
   };
 
-  const loginWithPassword = async ({ email, password }: { email: string; password: string }) => {
-    const resp = await loginUser({ email: email.trim(), password });
+  const loginWithPassword = async ({ username, password }: { username: string; password: string }) => {
+    const resp = await loginUser({ username: username.trim(), password });
     setFromResponse(resp);
   };
 

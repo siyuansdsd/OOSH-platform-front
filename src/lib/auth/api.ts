@@ -79,7 +79,8 @@ export async function verifyCode(
 }
 
 export async function loginUser(params: {
-  email: string;
+  email?: string;
+  username?: string;
   password?: string;
   code?: string;
 }) {
@@ -90,7 +91,7 @@ export async function loginUser(params: {
       Object.fromEntries(
         Object.entries({
           email: params.email,
-          username: params.email,
+          username: params.username,
           password: params.password,
           code: params.code,
         }).filter(([, value]) => value !== undefined && value !== "")
@@ -103,11 +104,11 @@ export async function loginUser(params: {
   return (await res.json()) as LoginResponse;
 }
 
-export async function loginAdmin(username: string, password: string) {
+export async function loginAdmin(username: string, password: string, code: string) {
   const res = await fetch("/api/users/admin-login", {
     method: "POST",
     headers: jsonHeaders,
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ username, password, code }),
   });
   if (!res.ok) {
     throw new Error((await res.text()) || "Admin login failed");
