@@ -90,6 +90,7 @@ export async function loginUser(params: {
       Object.fromEntries(
         Object.entries({
           email: params.email,
+          username: params.email,
           password: params.password,
           code: params.code,
         }).filter(([, value]) => value !== undefined && value !== "")
