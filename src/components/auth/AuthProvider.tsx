@@ -152,9 +152,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     code: string;
     isAdmin?: boolean;
   }) => {
-    await verifyCode(email, code, {
-      password: isAdmin ? password : undefined,
-    });
     const resp = await (isAdmin
       ? loginAdmin(email, password || "", code)
       : loginUser({ email, code }));
