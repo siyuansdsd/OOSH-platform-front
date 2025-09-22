@@ -26,10 +26,12 @@ export async function GET(req: NextRequest) {
     }
 
     const remoteUrl = buildRemoteUrl(req, base);
+    const authHeader = req.headers.get("authorization") || undefined;
     const res = await fetch(remoteUrl, {
       method: "GET",
       headers: {
         accept: "application/json",
+        ...(authHeader ? { Authorization: authHeader } : {}),
       },
       cache: "no-store",
     });
@@ -58,10 +60,14 @@ export async function POST(req: Request) {
         { status: 500 },
       );
     }
+    const authHeader = req.headers.get("authorization") || undefined;
     const json = await req.json().catch(() => ({}));
     const res = await fetch(`${base}/api/homeworks`, {
       method: "POST",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        ...(authHeader ? { Authorization: authHeader } : {}),
+      },
       body: JSON.stringify(json),
     });
     const text = await res.text();

@@ -10,6 +10,7 @@ import {
   type HomeworkCategory,
   type HomeworkRecord,
 } from "@/lib/api/homeworks";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 const PAGE_SIZE = 12;
 
@@ -26,6 +27,7 @@ const defaultFilters: Filters = {
 };
 
 export function HomePageClient() {
+  const { accessToken } = useAuth();
   const [formFilters, setFormFilters] = useState<Filters>(defaultFilters);
   const [activeFilters, setActiveFilters] = useState<Filters>(defaultFilters);
   const [typeFilter, setTypeFilter] = useState<FilterValue>("all");
@@ -58,6 +60,7 @@ export function HomePageClient() {
       page: number;
       append: boolean;
     }) => {
+      if (!accessToken) return;
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
@@ -72,7 +75,7 @@ export function HomePageClient() {
           name: params.filters.name || undefined,
           category: params.type === "all" ? undefined : params.type,
           signal: controller.signal,
-        });
+        }, accessToken);
         if (controller.signal.aborted) return;
         setItems((prev) => (params.append ? [...prev, ...result.items] : result.items));
         setPage(result.page);
@@ -89,16 +92,17 @@ export function HomePageClient() {
         }
       }
     },
-    []
+    [accessToken]
   );
 
   const initialisedRef = useRef(false);
 
   useEffect(() => {
+    if (!accessToken) return;
     if (initialisedRef.current) return;
     initialisedRef.current = true;
     runFetch({ filters: activeFilters, type: typeFilter, page: 1, append: false });
-  }, [activeFilters, typeFilter, runFetch]);
+  }, [accessToken, activeFilters, typeFilter, runFetch]);
 
   const handleSearch = () => {
     setActiveFilters(formFilters);

@@ -1,3 +1,5 @@
+import { fetchHomeworks, type HomeworkRecord } from "./homeworks";
+
 export type AdminUserRole = "temporary" | "standard" | "admin" | "employer";
 export type AdminUserStatus = "active" | "disabled" | "banned";
 
@@ -10,6 +12,7 @@ export interface AdminUserRecord {
   createdAt?: string;
   lastLoginAt?: string;
   notes?: string;
+  scope?: string;
 }
 
 export interface AdminHomeworkRecord {
@@ -56,9 +59,10 @@ async function send<T>(
 }
 
 export async function fetchAdminHomeworks(
-  params: Record<string, string | number | undefined> = {}
+  params: Record<string, string | number | undefined> = {},
+  token?: string
 ) {
-  const res = await fetchHomeworks(params);
+  const res = await fetchHomeworks(params, token);
   const items: AdminHomeworkRecord[] = res.items.map((item: HomeworkRecord) => {
     const raw = item.raw as Record<string, any> | undefined;
     return {
@@ -86,7 +90,10 @@ export async function fetchAdminHomeworks(
   } satisfies PaginatedResult<AdminHomeworkRecord>;
 }
 
-export async function fetchAdminUsers(params: Record<string, string | number | undefined> = {}) {
+export async function fetchAdminUsers(
+  params: Record<string, string | number | undefined> = {},
+  token?: string
+) {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== "") {
@@ -94,14 +101,28 @@ export async function fetchAdminUsers(params: Record<string, string | number | u
     }
   });
   return send<PaginatedResult<AdminUserRecord>>(
-    `/api/admin/users${search.toString() ? `?${search}` : ""}`
+    `/api/admin/users${search.toString() ? `?${search}` : ""}`,
+    token
+      ? {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      : undefined
   );
 }
 
-export async function updateAdminHomework(id: string, payload: AdminHomeworkRecord) {
+export async function updateAdminHomework(
+  id: string,
+  payload: AdminHomeworkRecord,
+  token: string
+) {
   const res = await fetch(`/api/homeworks/${encodeURIComponent(id)}`, {
     method: "PUT",
-    headers: { "content-type": "application/json" },
+    headers: {
+      "content-type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
     body: JSON.stringify({
       title: payload.title,
       description: payload.description,
@@ -122,11 +143,14 @@ export async function updateAdminHomework(id: string, payload: AdminHomeworkReco
   return (await res.json()) as AdminHomeworkRecord;
 }
 
-export async function deleteAdminHomeworks(ids: string[]) {
+export async function deleteAdminHomeworks(ids: string[], token: string) {
   await Promise.all(
     ids.map(async (id) => {
       const res = await fetch(`/api/homeworks/${encodeURIComponent(id)}`, {
         method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
       });
       if (!res.ok) {
         const text = await res.text();
@@ -137,20 +161,33 @@ export async function deleteAdminHomeworks(ids: string[]) {
   return { deleted: ids };
 }
 
-export async function updateAdminUser(id: string, payload: Partial<AdminUserRecord>) {
+export async function updateAdminUser(
+  id: string,
+  payload: Partial<AdminUserRecord>,
+  token: string
+) {
   return send<AdminUserRecord>(`/api/admin/users/${id}`, {
     method: "PUT",
     body: JSON.stringify(payload),
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
   });
 }
 
-export async function bulkUpdateAdminUsers(payload: {
-  ids: string[];
-  action: "delete" | "disable" | "enable" | "ban";
-}) {
+export async function bulkUpdateAdminUsers(
+  payload: {
+    ids: string[];
+    action: "delete" | "disable" | "enable" | "ban";
+  },
+  token: string
+) {
   return send<{ updated: string[] }>(`/api/admin/users`, {
     method: "POST",
     body: JSON.stringify(payload),
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
   });
 }
 
@@ -159,10 +196,16 @@ export interface CreateTemporaryAccountInput {
   password: string;
 }
 
-export async function createTemporaryAccount(input: CreateTemporaryAccountInput) {
+export async function createTemporaryAccount(
+  input: CreateTemporaryAccountInput,
+  token: string
+) {
   return send<AdminUserRecord>(`/api/admin/users`, {
     method: "POST",
     body: JSON.stringify({ action: "createTemporary", ...input }),
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
   });
 }
 
@@ -170,10 +213,15 @@ export interface CreateEmployerAccountsInput {
   accounts: Array<{ email: string; password: string }>;
 }
 
-export async function createEmployerAccounts(input: CreateEmployerAccountsInput) {
+export async function createEmployerAccounts(
+  input: CreateEmployerAccountsInput,
+  token: string
+) {
   return send<{ created: string[] }>(`/api/admin/users`, {
     method: "POST",
     body: JSON.stringify({ action: "createEmployerBatch", ...input }),
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
   });
 }
-import { fetchHomeworks, type HomeworkRecord } from "./homeworks";

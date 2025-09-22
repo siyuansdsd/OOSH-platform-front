@@ -18,9 +18,13 @@ export async function PUT(
     }
     const { id } = await params;
     const json = await req.json().catch(() => ({}));
+    const authHeader = req.headers.get("authorization") || undefined;
     const res = await fetch(`${base}/api/homeworks/${encodeURIComponent(id)}`, {
       method: "PUT",
-      headers: { "content-type": "application/json" },
+      headers: {
+        "content-type": "application/json",
+        ...(authHeader ? { Authorization: authHeader } : {}),
+      },
       body: JSON.stringify(json),
     });
     const text = await res.text();

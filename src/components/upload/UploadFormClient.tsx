@@ -10,6 +10,7 @@ import {
   type ValidationErrors,
   type UploadMode,
 } from "./UploadContext";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 const EN_NAME = /^[A-Za-z ]+$/;
 
@@ -35,6 +36,7 @@ function FieldError({
 }
 
 export default function UploadFormClient() {
+  const { accessToken } = useAuth();
   const [mode, setMode] = useState<UploadMode>("file");
   const [files, setFiles] = useState<File[]>([]);
   const [urls, setUrls] = useState<string[]>([""]);
@@ -152,9 +154,14 @@ export default function UploadFormClient() {
           mode,
         } as const;
 
+        if (!accessToken) throw new Error("Not authenticated");
+
         const presignRes = await fetch("/api/uploads/create-and-presign", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
           body: JSON.stringify(presignReq),
         });
         if (!presignRes.ok) {
@@ -372,7 +379,10 @@ export default function UploadFormClient() {
           `/api/homeworks/${encodeURIComponent(homeworkId)}`,
           {
             method: "PUT",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${accessToken}`,
+            },
             body: JSON.stringify({
               images,
               videos,
@@ -411,7 +421,10 @@ export default function UploadFormClient() {
         };
         const res = await fetch("/api/homeworks", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+          },
           body: JSON.stringify(payload),
         });
         if (!res.ok) {

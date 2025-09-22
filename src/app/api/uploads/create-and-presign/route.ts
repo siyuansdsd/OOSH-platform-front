@@ -10,20 +10,31 @@ export async function POST(req: Request) {
       );
     }
     const contentType = req.headers.get("content-type") || "";
+    const authHeader = req.headers.get("authorization") || undefined;
     let res: Response;
     if (contentType.includes("application/json")) {
       // Presign flow: forward JSON as-is
       const json = await req.json().catch(() => ({}));
       res = await fetch(`${base}/api/uploads/create-and-presign`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: {
+          "content-type": "application/json",
+          ...(authHeader ? { Authorization: authHeader } : {}),
+        },
         body: JSON.stringify(json),
       });
     } else {
       // File mode: forward multipart/form-data as-is
       res = await fetch(`${base}/api/uploads/create-and-presign`, {
         method: "POST",
-        headers: contentType ? { "content-type": contentType } : undefined,
+        headers: contentType
+          ? {
+              "content-type": contentType,
+              ...(authHeader ? { Authorization: authHeader } : {}),
+            }
+          : authHeader
+            ? { Authorization: authHeader }
+            : undefined,
         body: req.body,
         // req.body is a ReadableStream; undici requires duplex: 'half'
         duplex: "half" as any,

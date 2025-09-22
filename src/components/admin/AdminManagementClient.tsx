@@ -15,6 +15,7 @@ import {
   createTemporaryAccount,
   createEmployerAccounts,
 } from "@/lib/api/admin";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 interface EmployerDraft {
   email: string;
@@ -30,6 +31,7 @@ type EditingItem =
 const linkClass = "font-semibold italic underline";
 
 export function AdminManagementClient() {
+  const { accessToken } = useAuth();
   const [view, setView] = useState<ViewMode>("homeworks");
   const [homeworks, setHomeworks] = useState<AdminHomeworkRecord[]>([]);
   const [users, setUsers] = useState<AdminUserRecord[]>([]);
@@ -49,19 +51,21 @@ export function AdminManagementClient() {
   const [creatingEmployers, setCreatingEmployers] = useState(false);
 
   useEffect(() => {
+    if (!accessToken) return;
     void loadData(view);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view]);
+  }, [view, accessToken]);
 
   async function loadData(mode: ViewMode) {
     setLoading(true);
     setError(null);
     try {
+      if (!accessToken) throw new Error("Not authenticated");
       if (mode === "homeworks") {
-        const res = await fetchAdminHomeworks();
+        const res = await fetchAdminHomeworks({}, accessToken);
         setHomeworks(res.items);
       } else {
-        const res = await fetchAdminUsers();
+        const res = await fetchAdminUsers({}, accessToken);
         setUsers(res.items);
       }
     } catch (err: any) {
@@ -144,8 +148,9 @@ export function AdminManagementClient() {
     if (!editing) return;
     setSaving(true);
     try {
+      if (!accessToken) throw new Error("Not authenticated");
       if (editing.type === "homeworks") {
-        await updateAdminHomework(editing.draft.id, editing.draft);
+        await updateAdminHomework(editing.draft.id, editing.draft, accessToken);
         await loadData("homeworks");
       } else {
         const payload = {
@@ -154,7 +159,7 @@ export function AdminManagementClient() {
           status: editing.draft.status,
           notes: editing.draft.notes,
         };
-        await updateAdminUser(editing.draft.id, payload);
+        await updateAdminUser(editing.draft.id, payload, accessToken);
         await loadData("users");
       }
       setEditing(null);
@@ -168,11 +173,12 @@ export function AdminManagementClient() {
   const handleBulkAction = async (action: "delete" | "disable" | "ban" | "enable") => {
     if (selectedIds.length === 0) return;
     try {
+      if (!accessToken) throw new Error("Not authenticated");
       if (view === "homeworks" && action === "delete") {
-        await deleteAdminHomeworks(selectedIds);
+        await deleteAdminHomeworks(selectedIds, accessToken);
         await loadData("homeworks");
       } else if (view === "users") {
-        await bulkUpdateAdminUsers({ ids: selectedIds, action });
+        await bulkUpdateAdminUsers({ ids: selectedIds, action }, accessToken);
         await loadData("users");
       }
       setSelectedIds([]);
@@ -185,7 +191,8 @@ export function AdminManagementClient() {
     if (!tempAccount.username || !tempAccount.password) return;
     setCreatingTemp(true);
     try {
-      await createTemporaryAccount(tempAccount);
+      if (!accessToken) throw new Error("Not authenticated");
+      await createTemporaryAccount(tempAccount, accessToken);
       await loadData("users");
       setTempAccount({ username: "", password: "" });
     } catch (err: any) {
@@ -202,7 +209,8 @@ export function AdminManagementClient() {
     if (accounts.length === 0) return;
     setCreatingEmployers(true);
     try {
-      await createEmployerAccounts({ accounts });
+      if (!accessToken) throw new Error("Not authenticated");
+      await createEmployerAccounts({ accounts }, accessToken);
       await loadData("users");
       setEmployerDrafts([{ email: "", password: "" }]);
     } catch (err: any) {
@@ -214,6 +222,21 @@ export function AdminManagementClient() {
 
   const displayedSelected = selectedIds.filter((id) =>
     filteredRecords.some((record) => record.id === id)
+  );
+
+  const temporaryUsers = useMemo(
+    () => users.filter((user) => (user.role || "").toLowerCase() === "temporary"),
+    [users]
+  );
+
+  const editorUsers = useMemo(
+    () =>
+      users.filter((user) => {
+        const role = (user.role || "").toLowerCase();
+        const scopeValue = (user.scope || "").toLowerCase();
+        return role === "editor" || scopeValue === "admin";
+      }),
+    [users]
   );
 
   const renderHomeworkRow = (record: AdminHomeworkRecord) => (
@@ -343,6 +366,14 @@ export function AdminManagementClient() {
 
   const editingHomework = editing?.type === "homeworks" ? editing.draft : null;
   const editingUser = editing?.type === "users" ? editing.draft : null;
+
+  if (!accessToken) {
+    return (
+      <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6 text-sm text-foreground/60">
+        Checking authentication…
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
@@ -582,6 +613,40 @@ export function AdminManagementClient() {
               {creatingEmployers ? "Processing…" : "Create employer accounts"}
             </button>
           </div>
+        </div>
+      </section>
+
+      <section className="grid gap-6 lg:grid-cols-2">
+        <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6">
+          <h2 className="text-lg font-semibold text-foreground">Temporary accounts</h2>
+          {temporaryUsers.length === 0 ? (
+            <p className="mt-2 text-sm text-foreground/60">No temporary accounts created yet.</p>
+          ) : (
+            <ul className="mt-4 space-y-2 text-sm text-foreground/80">
+              {temporaryUsers.map((user) => (
+                <li key={user.id} className="truncate">
+                  <span className="font-medium">{user.username}</span>
+                  {user.email ? <span className="text-foreground/60"> · {user.email}</span> : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6">
+          <h2 className="text-lg font-semibold text-foreground">Editor / Admin accounts</h2>
+          {editorUsers.length === 0 ? (
+            <p className="mt-2 text-sm text-foreground/60">No editor accounts found.</p>
+          ) : (
+            <ul className="mt-4 space-y-2 text-sm text-foreground/80">
+              {editorUsers.map((user) => (
+                <li key={user.id} className="truncate">
+                  <span className="font-medium">{user.username}</span>
+                  {user.email ? <span className="text-foreground/60"> · {user.email}</span> : null}
+                  <span className="text-foreground/50"> · {user.role}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       </section>
 

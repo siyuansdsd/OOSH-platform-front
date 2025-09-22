@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { AuthProvider } from "@/components/auth/AuthProvider";
+import { NavBar } from "@/components/auth/NavBar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -27,25 +29,17 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <header className="sticky top-0 z-20 backdrop-blur supports-[backdrop-filter]:bg-white/40 dark:supports-[backdrop-filter]:bg-black/30 border-b border-foreground/10">
-          <div className="mx-auto max-w-6xl px-2 py-3 flex items-center justify-between">
-            <a href="/" className="font-semibold">
-              MaxHacker
-            </a>
-            <nav className="flex items-center gap-3 text-sm">
-              <a className="hover:underline" href="/upload">
-                Upload
+        <AuthProvider>
+          <header className="sticky top-0 z-20 border-b border-foreground/10 backdrop-blur supports-[backdrop-filter]:bg-white/40 dark:supports-[backdrop-filter]:bg-black/30">
+            <div className="mx-auto flex max-w-6xl items-center justify-between px-2 py-3">
+              <a href="/" className="font-semibold">
+                MaxHacker
               </a>
-              <a
-                className="rounded-full border border-foreground/20 px-3 py-1 hover:border-foreground/40 hover:bg-foreground/5"
-                href="/login"
-              >
-                Log in
-              </a>
-            </nav>
-          </div>
-        </header>
-        <main>{children}</main>
+              <NavBar />
+            </div>
+          </header>
+          <main>{children}</main>
+        </AuthProvider>
       </body>
     </html>
   );

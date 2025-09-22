@@ -290,7 +290,7 @@ const extractList = (
   return { items: toUnknownArray(payload), meta: payload };
 };
 
-export const fetchHomeworks = async (params: HomeworkListParams = {}) => {
+export const fetchHomeworks = async (params: HomeworkListParams = {}, token?: string) => {
   const searchParams = new URLSearchParams();
   if (params.page && params.page > 0) searchParams.set("page", String(params.page));
   if (params.pageSize && params.pageSize > 0)
@@ -305,6 +305,11 @@ export const fetchHomeworks = async (params: HomeworkListParams = {}) => {
     method: "GET",
     cache: "no-store",
     signal: params.signal,
+    headers: token
+      ? {
+          Authorization: `Bearer ${token}`,
+        }
+      : undefined,
   });
   if (!res.ok) {
     const message = await res
