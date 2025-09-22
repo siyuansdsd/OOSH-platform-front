@@ -29,7 +29,6 @@ export function LoginForm({ isAdmin }: LoginFormProps) {
     try {
       await sendCode(email.trim(), {
         password: isAdmin ? password : undefined,
-        purpose: isAdmin ? undefined : "login",
       });
       setMessage("Verification code sent. It expires in 5 minutes.");
     } catch {
