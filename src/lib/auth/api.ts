@@ -153,3 +153,25 @@ export async function registerUser(input: RegisterInput) {
   }
   return res.json().catch(() => ({}));
 }
+
+export async function updateCurrentUser(
+  payload: { display_name: string },
+  token: string
+) {
+  const res = await fetch("/api/users/me", {
+    method: "PATCH",
+    headers: {
+      ...jsonHeaders,
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || "Update failed");
+  }
+  const data = await res.json().catch(() => ({}));
+  const user = (data && typeof data === "object" && "user" in data
+    ? (data as { user: AuthUser }).user
+    : (data as AuthUser)) as AuthUser;
+  return user;
+}

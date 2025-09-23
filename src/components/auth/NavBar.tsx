@@ -39,9 +39,12 @@ export function NavBar() {
               Admin
             </Link>
           ) : null}
-          <span className="hidden sm:inline text-foreground/60">
-            {user?.username || user?.email}
-          </span>
+          <Link
+            href="/profile"
+            className="hidden sm:inline text-foreground/60 hover:underline"
+          >
+            {user?.display_name || user?.username || user?.email}
+          </Link>
           <button
             type="button"
             onClick={handleLogout}

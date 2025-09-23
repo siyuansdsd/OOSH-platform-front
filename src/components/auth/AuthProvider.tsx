@@ -1,6 +1,14 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   loginAdmin,
   loginUser,
@@ -8,6 +16,7 @@ import {
   refreshTokens,
   sendVerificationCode,
   verifyCode,
+  updateCurrentUser,
   type LoginResponse,
 } from "@/lib/auth/api";
 
@@ -26,6 +35,7 @@ interface AuthContextValue {
   loginWithPassword: (options: { username: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
+  updateProfile: (displayName: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -174,6 +184,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setFromResponse(resp);
   };
 
+  const updateProfile = useCallback(
+    async (displayName: string) => {
+      if (!session?.token) throw new Error("Not authenticated");
+      const updatedUser = await updateCurrentUser({ display_name: displayName }, session.token);
+      setSession((prev) =>
+        prev
+          ? {
+              ...prev,
+              user: {
+                ...prev.user,
+                ...updatedUser,
+                display_name: updatedUser.display_name ?? displayName,
+              },
+            }
+          : prev
+      );
+    },
+    [session?.token]
+  );
+
   const value = useMemo<AuthContextValue>(
     () => ({
       user: session?.user ?? null,
@@ -186,8 +216,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       loginWithPassword,
       logout,
       refresh: doRefresh,
+      updateProfile,
     }),
-    [session, loading]
+    [session, loading, updateProfile]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
