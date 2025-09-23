@@ -463,7 +463,7 @@ export default function UploadFormClient() {
   return (
     <UploadContext.Provider value={ctxValue}>
       <div className="mx-auto w-full max-w-3xl">
-        <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6 backdrop-blur-md">
+        <div className="glass-panel rounded-3xl p-6 shadow-lg">
           <h2 className="text-xl font-semibold mb-4">Content Upload</h2>
 
           <div className="mb-6">
@@ -502,7 +502,7 @@ export default function UploadFormClient() {
               type="button"
               disabled={submitting}
               onClick={handleSubmit}
-              className="rounded-xl bg-blue-600 px-5 py-2.5 text-white font-medium shadow-lg shadow-blue-600/20 transition-all duration-200 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60"
+              className="btn-gradient rounded-xl px-5 py-2.5 text-sm font-semibold text-foreground transition disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-200/80 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               Submit
             </button>

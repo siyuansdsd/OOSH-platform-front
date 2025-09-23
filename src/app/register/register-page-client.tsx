@@ -18,7 +18,7 @@ export function RegisterPageClient() {
 
   return (
     <div className="min-h-[calc(100vh-4rem)] px-4 py-10">
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-6 rounded-3xl border border-foreground/10 bg-white/5 p-6 text-foreground shadow-sm backdrop-blur">
+      <div className="glass-panel mx-auto flex w-full max-w-2xl flex-col gap-6 rounded-3xl p-6 text-foreground shadow-lg">
         <div>
           <h1 className="text-2xl font-semibold">Create your account</h1>
           <p className="mt-2 text-sm text-foreground/60">

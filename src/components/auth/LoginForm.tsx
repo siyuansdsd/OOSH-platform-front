@@ -88,7 +88,7 @@ export function LoginForm({ isAdmin }: LoginFormProps) {
               type="button"
               onClick={handleSendCode}
               disabled={sendingCode || cooldown > 0}
-              className="min-w-[7.5rem] whitespace-nowrap rounded-lg border border-transparent bg-gradient-to-r from-orange-500/80 via-white/70 to-blue-500/70 px-3 py-2 text-sm font-medium text-foreground shadow-sm backdrop-blur disabled:cursor-not-allowed disabled:opacity-60"
+              className="btn-gradient min-w-[7.5rem] whitespace-nowrap rounded-lg px-3 py-2 text-sm font-medium text-foreground disabled:cursor-not-allowed disabled:opacity-60"
             >
               {cooldown > 0 ? `${cooldown}s` : sendingCode ? "Sending" : "Verify"}
             </button>
@@ -137,7 +137,7 @@ export function LoginForm({ isAdmin }: LoginFormProps) {
       <button
         type="submit"
         disabled={submitting}
-        className="w-full rounded-lg border border-transparent bg-gradient-to-r from-orange-500/85 via-white/80 to-blue-500/80 px-4 py-2 text-sm font-semibold text-foreground shadow-lg backdrop-blur transition hover:from-orange-500/95 hover:via-white/90 hover:to-blue-500/90 disabled:cursor-not-allowed disabled:opacity-60"
+        className="btn-gradient w-full rounded-lg px-4 py-2 text-sm font-semibold text-foreground transition disabled:cursor-not-allowed disabled:opacity-60"
       >
         {submitting ? "Signing in…" : isAdmin ? "Admin Login" : "Login"}
       </button>

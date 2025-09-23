@@ -43,7 +43,7 @@ export function SearchBar({
   return (
     <form
       onSubmit={handleSubmit}
-      className={`flex flex-col gap-3 rounded-3xl border border-foreground/10 bg-white/5 p-4 shadow-sm backdrop-blur-md md:flex-row md:items-end ${className}`}
+      className={`glass-panel flex flex-col gap-3 rounded-3xl p-4 shadow-sm md:flex-row md:items-end ${className}`}
     >
       <label className="flex flex-col gap-2 text-sm text-foreground/80 md:flex-1">
         <span className="font-medium text-foreground">School</span>
@@ -76,7 +76,7 @@ export function SearchBar({
       <button
         type="submit"
         disabled={loading}
-        className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-foreground px-4 text-base font-medium text-background shadow-md transition hover:bg-foreground/90 focus:outline-none focus:ring-2 focus:ring-foreground focus:ring-offset-2 focus:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60 md:w-40"
+        className="btn-gradient inline-flex h-11 w-full items-center justify-center rounded-xl px-4 text-base font-medium text-foreground transition focus:outline-none focus:ring-2 focus:ring-orange-200/80 focus:ring-offset-2 focus:ring-offset-background disabled:cursor-not-allowed disabled:opacity-60 md:w-40"
       >
         {loading ? "Searching…" : "Search"}
       </button>

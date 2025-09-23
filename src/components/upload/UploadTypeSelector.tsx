@@ -17,10 +17,10 @@ export default function UploadTypeSelector() {
           key={opt.key}
           type="button"
           onClick={() => setMode(opt.key)}
-          className={`relative rounded-xl px-4 py-2 text-sm font-medium outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-blue-500/60 active:scale-[0.98] ${
+          className={`relative rounded-xl px-4 py-2 text-sm font-medium outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-orange-200/80 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent active:scale-[0.98] ${
             mode === opt.key
-              ? "bg-blue-600 text-white shadow-lg shadow-blue-600/20"
-              : "bg-white/5 text-foreground border border-foreground/10 hover:bg-white/10"
+              ? "glass-pill text-foreground"
+              : "border border-foreground/10 bg-white/15 text-foreground/80 hover:bg-white/25 hover:text-foreground"
           }`}
         >
           {opt.label}
