@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Gallery } from "@/components/home/Gallery";
 import { SearchBar } from "@/components/home/SearchBar";
 import { TypeFilter } from "@/components/home/TypeFilter";
-import { SYDNEY_SCHOOLS } from "@/data/schools";
+import { APPROVED_SCHOOLS } from "@/constants/schools";
 import {
   fetchHomeworks,
   type HomeworkCategory,
@@ -50,11 +50,7 @@ export function HomePageClient() {
     return parts.join(" · ");
   }, [activeFilters, typeFilter]);
 
-  const availableSchools = useMemo(() => {
-    const dynamic = items.map((item) => item.schoolName);
-    const merged = new Set<string>([...SYDNEY_SCHOOLS, ...dynamic]);
-    return Array.from(merged);
-  }, [items]);
+  const availableSchools = useMemo(() => [...APPROVED_SCHOOLS], []);
 
   const runFetch = useCallback(
     async (params: {
