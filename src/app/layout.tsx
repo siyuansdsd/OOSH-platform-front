@@ -18,11 +18,9 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "MaxHacker OOSH Platform",
-  description: "A minimal upload platform",
+  description: "A mini upload and student source viewing platform",
   icons: {
-    icon: [
-      { url: "/favicon.png", type: "image/png" },
-    ],
+    icon: [{ url: "/favicon.svg", type: "image/svg+xml" }],
   },
 };
 
