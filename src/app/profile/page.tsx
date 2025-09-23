@@ -22,8 +22,16 @@ function ProfileForm() {
   const [message, setMessage] = useState<MessageState>(null);
 
   useEffect(() => {
-    setDisplayName(user?.display_name ?? user?.username ?? "");
-    setEmail(user?.email ?? "");
+    const nextDisplay =
+      typeof user?.display_name === "string"
+        ? user.display_name
+        : typeof user?.username === "string"
+        ? user.username
+        : "";
+    const nextEmail =
+      typeof user?.email === "string" ? user.email : "";
+    setDisplayName(nextDisplay);
+    setEmail(nextEmail);
   }, [user?.display_name, user?.username, user?.email]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
