@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   description: "A minimal upload platform",
   icons: {
     icon: [
-      { url: BRAND_LOGO_URL, type: "image/png" },
+      { url: "/favicon.png", type: "image/png" },
     ],
   },
 };

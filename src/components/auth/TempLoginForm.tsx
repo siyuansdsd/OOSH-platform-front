@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { BRAND_LOGO_URL, BRAND_NAME } from "@/constants/branding";
 
 export function TempLoginForm() {
   const { loginWithPassword } = useAuth();
@@ -30,6 +31,16 @@ export function TempLoginForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="flex flex-col items-center gap-2 py-2">
+        <img
+          src={BRAND_LOGO_URL}
+          alt={`${BRAND_NAME} logo`}
+          className="h-14 w-14 rounded-full border border-white/60 bg-white/80 object-contain shadow"
+        />
+        <span className="text-xs uppercase tracking-wide text-foreground/50">
+          {BRAND_NAME}
+        </span>
+      </div>
       <label className="flex flex-col gap-1 text-sm text-foreground/80">
         Username
         <input
@@ -57,7 +68,7 @@ export function TempLoginForm() {
       <button
         type="submit"
         disabled={submitting}
-        className="w-full rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background disabled:cursor-not-allowed disabled:opacity-60"
+        className="btn-gradient w-full rounded-lg px-4 py-2 text-sm font-semibold text-foreground transition disabled:cursor-not-allowed disabled:opacity-60"
       >
         {submitting ? "Signing in…" : "Login"}
       </button>
