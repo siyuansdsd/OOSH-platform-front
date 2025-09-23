@@ -3,7 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { registerUser, type RegisterInput } from "@/lib/auth/api";
-import { APPROVED_SCHOOLS } from "@/constants/schools";
+import { APPROVED_SCHOOLS, type ApprovedSchool } from "@/constants/schools";
 import { BRAND_LOGO_URL, BRAND_NAME } from "@/constants/branding";
 
 export function RegisterForm() {
@@ -14,7 +14,8 @@ export function RegisterForm() {
   const [street, setStreet] = useState("");
   const [suburb, setSuburb] = useState("");
   const [city, setCity] = useState("");
-  const [childrenSchool, setChildrenSchool] = useState("");
+  const [childrenSchool, setChildrenSchool] = useState<ApprovedSchool | "">
+    ("");
   const [childrenAge, setChildrenAge] = useState("");
   const [message, setMessage] = useState<{
     text: string;
@@ -175,7 +176,9 @@ export function RegisterForm() {
         Children school
         <select
           value={childrenSchool}
-          onChange={(e) => setChildrenSchool(e.target.value)}
+          onChange={(e) =>
+            setChildrenSchool(e.target.value as ApprovedSchool | "")
+          }
           className="rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
         >
           <option value="">Select a school</option>

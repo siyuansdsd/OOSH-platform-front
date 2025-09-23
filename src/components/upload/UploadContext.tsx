@@ -1,6 +1,7 @@
 "use client";
 
 import React, { createContext, useContext } from "react";
+import type { ApprovedSchool } from "@/constants/schools";
 
 export type UploadMode = "file" | "url";
 
@@ -13,8 +14,8 @@ export interface UploadContextType {
   setFiles: (f: File[]) => void;
   urls: string[];
   setUrls: (u: string[]) => void;
-  schoolName: string;
-  setSchoolName: (v: string) => void;
+  schoolName: ApprovedSchool | "";
+  setSchoolName: (v: ApprovedSchool | "") => void;
   title: string;
   setTitle: (v: string) => void;
   description: string;

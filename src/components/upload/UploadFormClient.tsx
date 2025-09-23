@@ -11,7 +11,7 @@ import {
   type UploadMode,
 } from "./UploadContext";
 import { useAuth } from "@/components/auth/AuthProvider";
-import { APPROVED_SCHOOLS } from "@/constants/schools";
+import { APPROVED_SCHOOLS, type ApprovedSchool } from "@/constants/schools";
 
 const EN_NAME = /^[A-Za-z ]+$/;
 
@@ -41,7 +41,8 @@ export default function UploadFormClient() {
   const [mode, setMode] = useState<UploadMode>("file");
   const [files, setFiles] = useState<File[]>([]);
   const [urls, setUrls] = useState<string[]>([""]);
-  const [schoolName, setSchoolName] = useState("");
+  const [schoolName, setSchoolName] = useState<ApprovedSchool | "">
+    ("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [groupName, setGroupName] = useState("");
@@ -103,7 +104,7 @@ export default function UploadFormClient() {
       else if (!EN_NAME.test(trimmed))
         e[key] = `${label} must be English letters and spaces only`;
     };
-    if (!APPROVED_SCHOOLS.includes(schoolName)) {
+    if (!schoolName) {
       e.schoolName = "Select a school from the list";
     }
     if (!title.trim()) e.title = "Title is required";
@@ -572,7 +573,9 @@ function TraditionalFields() {
         <div className="mb-1 text-sm text-foreground/80">School Name</div>
         <select
           value={schoolName}
-          onChange={(e) => setSchoolName(e.target.value)}
+          onChange={(e) =>
+            setSchoolName(e.target.value as ApprovedSchool | "")
+          }
           disabled={disabled}
           className={`${baseInput} bg-white/80 dark:bg-black/40`}
         >
