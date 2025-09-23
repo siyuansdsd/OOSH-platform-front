@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState } from "react";
+import { BRAND_LOGO_URL, BRAND_NAME } from "@/constants/branding";
 import { useAuth } from "./AuthProvider";
 
 interface LoginFormProps {
@@ -72,6 +73,16 @@ export function LoginForm({ isAdmin }: LoginFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="flex flex-col items-center gap-2 py-2">
+        <img
+          src={BRAND_LOGO_URL}
+          alt={`${BRAND_NAME} logo`}
+          className="h-14 w-14 rounded-full border border-white/60 bg-white/80 object-contain shadow"
+        />
+        <span className="text-xs uppercase tracking-wide text-foreground/50">
+          {BRAND_NAME}
+        </span>
+      </div>
       <div>
         <label className="flex flex-col gap-1 text-sm text-foreground/80">
           Email

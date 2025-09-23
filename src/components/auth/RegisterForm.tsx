@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { registerUser, type RegisterInput } from "@/lib/auth/api";
+import { BRAND_LOGO_URL, BRAND_NAME } from "@/constants/branding";
 
 export function RegisterForm() {
   const { sendCode, login } = useAuth();
@@ -91,6 +92,16 @@ export function RegisterForm() {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="flex flex-col items-center gap-2 py-2">
+        <img
+          src={BRAND_LOGO_URL}
+          alt={`${BRAND_NAME} logo`}
+          className="h-14 w-14 rounded-full border border-white/60 bg-white/80 object-contain shadow"
+        />
+        <span className="text-xs uppercase tracking-wide text-foreground/50">
+          {BRAND_NAME}
+        </span>
+      </div>
       <label className="flex flex-col gap-1 text-sm text-foreground/80">
         Email
         <div className="flex gap-2">
