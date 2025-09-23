@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { TouchEvent } from "react";
 import type { HomeworkRecord } from "@/lib/api/homeworks";
 
 interface GalleryProps {
@@ -132,6 +133,9 @@ export function Gallery({
   emptyState,
 }: GalleryProps) {
   const [modalItem, setModalItem] = useState<HomeworkRecord | null>(null);
+  const [mediaIndex, setMediaIndex] = useState(0);
+  const touchStartRef = useRef<number | null>(null);
+  const touchCurrentRef = useRef<number | null>(null);
 
   const gridItems = useMemo(() => items ?? [], [items]);
 
@@ -148,6 +152,69 @@ export function Gallery({
         )
       )
     : [];
+
+  const mediaItems = useMemo(() => {
+    if (!modalItem) return [] as Array<{ type: "image" | "video"; src: string }>;
+    const itemsList: Array<{ type: "image" | "video"; src: string }> = [];
+    modalItem.images.forEach((src) => {
+      if (src) itemsList.push({ type: "image", src });
+    });
+    modalItem.videos.forEach((src) => {
+      if (src) itemsList.push({ type: "video", src });
+    });
+    return itemsList;
+  }, [modalItem]);
+
+  useEffect(() => {
+    setMediaIndex(0);
+  }, [modalItem?.id]);
+
+  const handleNextMedia = () => {
+    if (mediaItems.length === 0) return;
+    setMediaIndex((prev) => (prev + 1) % mediaItems.length);
+  };
+
+  const handlePrevMedia = () => {
+    if (mediaItems.length === 0) return;
+    setMediaIndex((prev) => (prev - 1 + mediaItems.length) % mediaItems.length);
+  };
+
+  const handleTouchStart = (event: TouchEvent<HTMLDivElement>) => {
+    touchStartRef.current = event.touches[0]?.clientX ?? null;
+    touchCurrentRef.current = touchStartRef.current;
+  };
+
+  const handleTouchMove = (event: TouchEvent<HTMLDivElement>) => {
+    touchCurrentRef.current = event.touches[0]?.clientX ?? null;
+  };
+
+  const handleTouchEnd = () => {
+    if (touchStartRef.current === null || touchCurrentRef.current === null) {
+      touchStartRef.current = null;
+      touchCurrentRef.current = null;
+      return;
+    }
+    const delta = touchStartRef.current - touchCurrentRef.current;
+    const SWIPE_THRESHOLD = 40;
+    if (Math.abs(delta) > SWIPE_THRESHOLD) {
+      if (delta > 0) handleNextMedia();
+      else handlePrevMedia();
+    }
+    touchStartRef.current = null;
+    touchCurrentRef.current = null;
+  };
+
+  const detailLine = useMemo(() => {
+    if (!modalItem) return "";
+    const parts: string[] = [];
+    if (modalItem.groupName || modalItem.personName) {
+      parts.push(modalItem.groupName || modalItem.personName || "");
+    }
+    if (modalStudents.length > 0) {
+      parts.push(modalStudents.join(", "));
+    }
+    return parts.filter(Boolean).join(" · ");
+  }, [modalItem, modalStudents]);
 
   const openModal = (item: HomeworkRecord) => {
     setModalItem(item);
@@ -355,13 +422,13 @@ export function Gallery({
       ) : null}
 
       {modalItem ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8 sm:px-6">
           <div
             className="absolute inset-0 bg-black/70"
             onClick={closeModal}
             aria-hidden="true"
           />
-          <div className="relative z-10 max-h-[90vh] w-[min(90vw,960px)] overflow-y-auto rounded-3xl bg-background p-6 text-foreground shadow-2xl">
+          <div className="relative z-10 max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-background/95 p-4 text-foreground shadow-2xl backdrop-blur sm:p-6">
             <button
               type="button"
               onClick={closeModal}
@@ -371,78 +438,120 @@ export function Gallery({
               ×
             </button>
             <div className="flex flex-col gap-6">
-              <header className="space-y-3">
-                <span className="text-xs uppercase tracking-wide text-foreground/50">
-                  Project overview
-                </span>
-                <h2 className="text-2xl font-semibold text-foreground">{modalTitle}</h2>
-                <div className="flex flex-wrap gap-x-6 gap-y-2 text-sm text-foreground/70">
-                  <div>
-                    <span className="font-medium text-foreground">School:</span> {modalItem.schoolName}
-                  </div>
-                  {modalItem.groupName ? (
-                    <div>
-                      <span className="font-medium text-foreground">Team:</span> {modalItem.groupName}
+              <div
+                className="relative h-[280px] w-full overflow-hidden rounded-3xl bg-black/70 sm:h-[360px]"
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+              >
+                {mediaItems.length > 0 ? (
+                  <>
+                    <div
+                      className="flex h-full w-full transition-transform duration-300"
+                      style={{ transform: `translateX(-${mediaIndex * 100}%)` }}
+                    >
+                      {mediaItems.map((media) => (
+                        <div
+                          key={`${media.type}-${media.src}`}
+                          className="flex h-full w-full flex-shrink-0 items-center justify-center bg-black/80"
+                        >
+                          {media.type === "image" ? (
+                            <img
+                              src={media.src}
+                              alt={modalTitle}
+                              className="h-full w-full object-contain"
+                            />
+                          ) : (
+                            <video
+                              src={media.src}
+                              controls
+                              playsInline
+                              className="h-full w-full object-contain"
+                            >
+                              Your browser does not support the video tag.
+                            </video>
+                          )}
+                        </div>
+                      ))}
                     </div>
-                  ) : null}
-                  {modalStudents.length > 0 ? (
-                    <div>
-                      <span className="font-medium text-foreground">Students:</span> {modalStudents.join(", ")}
-                    </div>
-                  ) : null}
-                </div>
-              </header>
-
-              {modalItem.description ? (
-                <p className="rounded-2xl bg-foreground/5 p-4 text-sm leading-relaxed text-foreground/80">
-                  {modalItem.description}
-                </p>
-              ) : null}
-
-              {modalItem.images.length > 0 ? (
-                <section className="space-y-3">
-                  <h3 className="text-sm font-semibold text-foreground">Images</h3>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {modalItem.images.map((image) => (
-                      <img
-                        key={image}
-                        src={image}
-                        alt={modalTitle}
-                        className="w-full rounded-2xl object-cover"
-                      />
-                    ))}
+                    {mediaItems.length > 1 ? (
+                      <>
+                        <span className="absolute right-4 top-4 rounded-full bg-black/60 px-3 py-1 text-xs font-medium text-white shadow">
+                          {mediaIndex + 1}/{mediaItems.length}
+                        </span>
+                        <div className="absolute inset-x-0 bottom-4 flex items-center justify-center gap-2">
+                          {mediaItems.map((_, idx) => (
+                            <button
+                              key={idx}
+                              type="button"
+                              onClick={() => setMediaIndex(idx)}
+                              className={`h-2.5 w-2.5 rounded-full transition ${
+                                idx === mediaIndex ? "bg-white" : "bg-white/40"
+                              }`}
+                              aria-label={`Go to media ${idx + 1}`}
+                            />
+                          ))}
+                        </div>
+                        <div className="pointer-events-none absolute inset-0 flex items-center justify-between px-2">
+                          <button
+                            type="button"
+                            onClick={handlePrevMedia}
+                            className="pointer-events-auto hidden size-10 items-center justify-center rounded-full bg-black/40 text-white transition hover:bg-black/60 sm:flex"
+                            aria-label="Previous media"
+                          >
+                            ‹
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleNextMedia}
+                            className="pointer-events-auto hidden size-10 items-center justify-center rounded-full bg-black/40 text-white transition hover:bg-black/60 sm:flex"
+                            aria-label="Next media"
+                          >
+                            ›
+                          </button>
+                        </div>
+                      </>
+                    ) : null}
+                  </>
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-sm text-white/70">
+                    No media available
                   </div>
-                </section>
-              ) : null}
+                )}
+              </div>
 
-              {modalItem.videos.length > 0 ? (
-                <section className="space-y-3">
-                  <h3 className="text-sm font-semibold text-foreground">Videos</h3>
-                  <div className="grid grid-cols-1 gap-4">
-                    {modalItem.videos.map((video) => (
-                      <video
-                        key={video}
-                        src={video}
-                        controls
-                        playsInline
-                        className="w-full overflow-hidden rounded-2xl"
-                      >
-                        Your browser does not support the video tag.
-                      </video>
-                    ))}
-                  </div>
-                </section>
-              ) : null}
+              <div className="space-y-3">
+                <h2 className="text-xl font-semibold text-foreground sm:text-2xl">{modalTitle}</h2>
+                {detailLine ? (
+                  <p className="text-sm text-foreground/60">{detailLine}</p>
+                ) : null}
+                {modalItem.schoolName ? (
+                  <p className="text-xs uppercase tracking-wide text-foreground/40">
+                    {modalItem.schoolName}
+                  </p>
+                ) : null}
+                {modalItem.description ? (
+                  <p className="text-sm leading-relaxed text-foreground/80">
+                    {modalItem.description}
+                  </p>
+                ) : null}
+              </div>
 
               {modalItem.urls.length > 0 ? (
-                <section className="space-y-3">
-                  <h3 className="text-sm font-semibold text-foreground">Websites</h3>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {modalItem.urls.map((url) => (
-                      <WebsitePreview key={url} url={url} />
-                    ))}
-                  </div>
-                </section>
+                <div className="flex flex-wrap gap-2">
+                  {modalItem.urls.map((url) => (
+                    <a
+                      key={url}
+                      href={url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-1 rounded-full border border-foreground/20 bg-white/60 px-3 py-1 text-xs font-medium text-foreground shadow-sm transition hover:border-foreground/40 hover:bg-white"
+                    >
+                      View site
+                      <span aria-hidden="true">→</span>
+                    </a>
+                  ))}
+                </div>
               ) : null}
             </div>
           </div>
