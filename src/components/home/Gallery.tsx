@@ -154,13 +154,16 @@ export function Gallery({
     : [];
 
   const mediaItems = useMemo(() => {
-    if (!modalItem) return [] as Array<{ type: "image" | "video"; src: string }>;
-    const itemsList: Array<{ type: "image" | "video"; src: string }> = [];
+    if (!modalItem) return [] as Array<{ type: "image" | "video" | "website"; src: string }>;
+    const itemsList: Array<{ type: "image" | "video" | "website"; src: string }> = [];
     modalItem.images.forEach((src) => {
       if (src) itemsList.push({ type: "image", src });
     });
     modalItem.videos.forEach((src) => {
       if (src) itemsList.push({ type: "video", src });
+    });
+    modalItem.urls.forEach((src) => {
+      if (src) itemsList.push({ type: "website", src });
     });
     return itemsList;
   }, [modalItem]);
@@ -285,6 +288,34 @@ export function Gallery({
 
     useEffect(() => () => stopVideo(), []);
 
+    if (imageCount > 0) {
+      return (
+        <div className="group relative aspect-[4/3] w-full overflow-hidden rounded-2xl">
+          <img
+            src={item.images[0]}
+            alt={item.title || item.groupName || item.personName || "Project image"}
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+          />
+          {badges.length > 0 ? (
+            <div className="pointer-events-none absolute right-3 top-3 flex w-32 flex-col items-end gap-1 text-xs font-semibold text-white">
+              {badges.map((badge) => (
+                <span
+                  key={badge.label}
+                  className={`inline-flex w-full justify-center rounded-full px-3 py-1 ${
+                    badge.variant === "video"
+                      ? "bg-sky-500/80"
+                      : "bg-orange-500/80"
+                  }`}
+                >
+                  {badge.label}
+                </span>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      );
+    }
+
     if (videoCount > 0) {
       return (
         <div
@@ -307,34 +338,6 @@ export function Gallery({
           >
             Your browser does not support the video tag.
           </video>
-          {badges.length > 0 ? (
-            <div className="pointer-events-none absolute right-3 top-3 flex w-32 flex-col items-end gap-1 text-xs font-semibold text-white">
-              {badges.map((badge) => (
-                <span
-                  key={badge.label}
-                  className={`inline-flex w-full justify-center rounded-full px-3 py-1 ${
-                    badge.variant === "video"
-                      ? "bg-sky-500/80"
-                      : "bg-orange-500/80"
-                  }`}
-                >
-                  {badge.label}
-                </span>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      );
-    }
-
-    if (imageCount > 0) {
-      return (
-        <div className="group relative aspect-[4/3] w-full overflow-hidden rounded-2xl">
-          <img
-            src={item.images[0]}
-            alt={item.title || item.groupName || item.personName || "Project image"}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-          />
           {badges.length > 0 ? (
             <div className="pointer-events-none absolute right-3 top-3 flex w-32 flex-col items-end gap-1 text-xs font-semibold text-white">
               {badges.map((badge) => (
@@ -461,7 +464,7 @@ export function Gallery({
                               alt={modalTitle}
                               className="h-full w-full object-contain"
                             />
-                          ) : (
+                          ) : media.type === "video" ? (
                             <video
                               src={media.src}
                               controls
@@ -470,6 +473,10 @@ export function Gallery({
                             >
                               Your browser does not support the video tag.
                             </video>
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center p-4">
+                              <WebsitePreview url={media.src} interactive={false} />
+                            </div>
                           )}
                         </div>
                       ))}
