@@ -114,7 +114,10 @@ export function HomePageClient() {
 
   const handleTypeChange = (next: FilterValue) => {
     setTypeFilter(next);
-    runFetch({ filters: activeFilters, type: next, page: 1, append: false });
+  };
+
+  const handleRefresh = () => {
+    runFetch({ filters: activeFilters, type: typeFilter, page: 1, append: false });
   };
 
   const loadMore = () => {
@@ -169,7 +172,12 @@ export function HomePageClient() {
         loading={loading && !loadingMore}
       />
 
-      <TypeFilter value={typeFilter} onChange={handleTypeChange} />
+      <TypeFilter
+        value={typeFilter}
+        onChange={handleTypeChange}
+        onRefresh={handleRefresh}
+        refreshing={loading && !loadingMore}
+      />
 
       {appliedFiltersLabel ? (
         <div className="text-sm text-foreground/60">
