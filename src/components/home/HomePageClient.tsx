@@ -124,11 +124,40 @@ export function HomePageClient() {
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
+  const filteredBySearch = useMemo(() => {
+    const normalizedSchool = activeFilters.school.trim().toLowerCase();
+    const normalizedName = activeFilters.name.trim().toLowerCase();
+
+    if (!normalizedSchool && !normalizedName) return items;
+
+    return items.filter((item) => {
+      const matchesSchool = normalizedSchool
+        ? (item.schoolName || "").toLowerCase().includes(normalizedSchool)
+        : true;
+
+      if (!matchesSchool) return false;
+
+      if (!normalizedName) return true;
+
+      const nameHaystack = [
+        item.title,
+        item.groupName,
+        item.personName,
+        ...(item.members || []),
+      ]
+        .filter(Boolean)
+        .map((entry) => String(entry).toLowerCase());
+
+      return nameHaystack.some((value) => value.includes(normalizedName));
+    });
+  }, [items, activeFilters]);
+
   const displayItems = useMemo(() => {
-    if (typeFilter === "media") return items.filter((item) => item.hasMedia);
-    if (typeFilter === "website") return items.filter((item) => item.hasWebsite);
-    return items;
-  }, [items, typeFilter]);
+    if (typeFilter === "media") return filteredBySearch.filter((item) => item.hasMedia);
+    if (typeFilter === "website")
+      return filteredBySearch.filter((item) => item.hasWebsite);
+    return filteredBySearch;
+  }, [filteredBySearch, typeFilter]);
 
   return (
     <div className="flex flex-col gap-6">

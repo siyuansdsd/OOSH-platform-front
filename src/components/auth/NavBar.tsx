@@ -13,9 +13,7 @@ export function NavBar() {
 
   const role = (user?.role || "").toLowerCase();
   const normalizedScope = (scope || "").toLowerCase();
-  const isRegularRole = role === "" || role === "standard";
-  const isRegularScope = normalizedScope === "" || normalizedScope === "user";
-  const canSeeUpload = !(isRegularRole && isRegularScope);
+  const canSeeUpload = normalizedScope === "admin" || role !== "user";
 
   const handleLogout = async () => {
     setBusy(true);
@@ -36,7 +34,7 @@ export function NavBar() {
               Upload
             </Link>
           ) : null}
-          {scope === "admin" ? (
+          {normalizedScope === "admin" ? (
             <Link className="hover:underline" href="/adminmanagement">
               Admin
             </Link>
