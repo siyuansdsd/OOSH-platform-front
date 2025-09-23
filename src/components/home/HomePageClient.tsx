@@ -15,6 +15,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 const PAGE_SIZE = 12;
 
 type FilterValue = "all" | HomeworkCategory;
+const DEFAULT_TYPE: FilterValue = "media";
 
 type Filters = {
   school: string;
@@ -30,7 +31,7 @@ export function HomePageClient() {
   const { accessToken } = useAuth();
   const [formFilters, setFormFilters] = useState<Filters>(defaultFilters);
   const [activeFilters, setActiveFilters] = useState<Filters>(defaultFilters);
-  const [typeFilter, setTypeFilter] = useState<FilterValue>("all");
+  const [typeFilter, setTypeFilter] = useState<FilterValue>(DEFAULT_TYPE);
   const [items, setItems] = useState<HomeworkRecord[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
@@ -43,7 +44,9 @@ export function HomePageClient() {
     const parts: string[] = [];
     if (activeFilters.school) parts.push(activeFilters.school);
     if (activeFilters.name) parts.push(`Name: ${activeFilters.name}`);
-    if (typeFilter !== "all") parts.push(typeFilter === "media" ? "Media" : "Website");
+    if (typeFilter !== "all" && typeFilter !== DEFAULT_TYPE) {
+      parts.push(typeFilter === "media" ? "Media" : "Website");
+    }
     return parts.join(" · ");
   }, [activeFilters, typeFilter]);
 

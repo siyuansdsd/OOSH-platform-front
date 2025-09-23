@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "./AuthProvider";
 
 interface LoginFormProps {
@@ -13,15 +13,22 @@ export function LoginForm({ isAdmin }: LoginFormProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<{ text: string; variant: "error" | "success" } | null>(null);
   const [sendingCode, setSendingCode] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
 
   const canSendCode = email.trim().length > 0 && (isAdmin ? password.trim().length > 0 : true);
 
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = setTimeout(() => setCooldown((prev) => prev - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [cooldown]);
+
   const handleSendCode = async () => {
     if (!canSendCode) {
-      setMessage("Fields cannot be empty.");
+      setMessage({ text: "Fields cannot be empty.", variant: "error" });
       return;
     }
     setMessage(null);
@@ -30,9 +37,10 @@ export function LoginForm({ isAdmin }: LoginFormProps) {
       await sendCode(email.trim(), {
         password: isAdmin ? password : undefined,
       });
-      setMessage("Verification code sent. It expires in 5 minutes.");
+      setMessage({ text: "Verification code sent. It expires in 5 minutes.", variant: "success" });
+      setCooldown(60);
     } catch {
-      setMessage("Email verification failed.");
+      setMessage({ text: "Email verification failed.", variant: "error" });
     } finally {
       setSendingCode(false);
     }
@@ -42,7 +50,7 @@ export function LoginForm({ isAdmin }: LoginFormProps) {
     event.preventDefault();
     setMessage(null);
     if (!email.trim() || !code.trim() || (isAdmin && !password.trim())) {
-      setMessage("Fields cannot be empty.");
+      setMessage({ text: "Fields cannot be empty.", variant: "error" });
       return;
     }
     setSubmitting(true);
@@ -53,9 +61,9 @@ export function LoginForm({ isAdmin }: LoginFormProps) {
         code: code.trim(),
         isAdmin,
       });
-      setMessage("Login successful");
+      setMessage({ text: "Login successful", variant: "success" });
     } catch {
-      setMessage("Verification code is incorrect or expired.");
+      setMessage({ text: "Verification code is incorrect or expired.", variant: "error" });
     } finally {
       setSubmitting(false);
     }
@@ -78,10 +86,10 @@ export function LoginForm({ isAdmin }: LoginFormProps) {
             <button
               type="button"
               onClick={handleSendCode}
-              disabled={sendingCode}
+              disabled={sendingCode || cooldown > 0}
               className="whitespace-nowrap rounded-lg border border-foreground/20 px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {sendingCode ? "Sending…" : "Verify"}
+              {sendingCode ? "Sending…" : cooldown > 0 ? `${cooldown}s` : "Verify"}
             </button>
           </div>
         </label>
@@ -112,11 +120,19 @@ export function LoginForm({ isAdmin }: LoginFormProps) {
           />
         </label>
       </div>
-      {message ? (
-        <div className="rounded-lg border border-foreground/20 bg-background/60 px-3 py-2 text-xs text-foreground">
-          {message}
-        </div>
-      ) : null}
+      <div className="min-h-[44px]">
+        {message ? (
+          <div
+            className={`rounded-lg border px-3 py-2 text-xs ${
+              message.variant === "error"
+                ? "border-red-300 bg-red-50 text-red-600"
+                : "border-emerald-200 bg-emerald-50 text-emerald-600"
+            }`}
+          >
+            {message.text}
+          </div>
+        ) : null}
+      </div>
       <button
         type="submit"
         disabled={submitting}

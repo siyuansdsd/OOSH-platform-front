@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { registerUser, type RegisterInput } from "@/lib/auth/api";
 
@@ -14,24 +14,38 @@ export function RegisterForm() {
   const [city, setCity] = useState("");
   const [childrenSchool, setChildrenSchool] = useState("");
   const [childrenAge, setChildrenAge] = useState("");
-  const [message, setMessage] = useState<string | null>(null);
+  const [message, setMessage] = useState<{
+    text: string;
+    variant: "error" | "success";
+  } | null>(null);
   const [sendingCode, setSendingCode] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [cooldown, setCooldown] = useState(0);
 
   const canSendCode = email.trim().length > 0;
 
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = setTimeout(() => setCooldown((prev) => prev - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [cooldown]);
+
   const handleSendCode = async () => {
     if (!canSendCode) {
-      setMessage("Fields cannot be empty.");
+      setMessage({ text: "Fields cannot be empty.", variant: "error" });
       return;
     }
     setMessage(null);
     setSendingCode(true);
     try {
       await sendCode(email.trim(), { purpose: "register" });
-      setMessage("Verification code sent. It expires in 5 minutes.");
+      setMessage({
+        text: "Verification code sent. It expires in 5 minutes.",
+        variant: "success",
+      });
+      setCooldown(60);
     } catch {
-      setMessage("Email verification failed.");
+      setMessage({ text: "Email verification failed.", variant: "error" });
     } finally {
       setSendingCode(false);
     }
@@ -41,7 +55,7 @@ export function RegisterForm() {
     event.preventDefault();
     setMessage(null);
     if (!email.trim() || !code.trim()) {
-      setMessage("Fields cannot be empty.");
+      setMessage({ text: "Fields cannot be empty.", variant: "error" });
       return;
     }
     setSubmitting(true);
@@ -63,9 +77,12 @@ export function RegisterForm() {
       };
       await registerUser(payload);
       await login({ email: payload.email, code: payload.code });
-      setMessage("Registration successful");
+      setMessage({ text: "Registration successful", variant: "success" });
     } catch {
-      setMessage("Verification code is incorrect or expired.");
+      setMessage({
+        text: "Verification code is incorrect or expired.",
+        variant: "error",
+      });
     } finally {
       setSubmitting(false);
     }
@@ -86,10 +103,14 @@ export function RegisterForm() {
           <button
             type="button"
             onClick={handleSendCode}
-            disabled={sendingCode}
+            disabled={sendingCode || cooldown > 0}
             className="whitespace-nowrap rounded-lg border border-foreground/20 px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {sendingCode ? "Sending…" : "Send code"}
+            {sendingCode
+              ? "Sending…"
+              : cooldown > 0
+              ? `${cooldown}s`
+              : "Send code"}
           </button>
         </div>
       </label>
@@ -159,11 +180,19 @@ export function RegisterForm() {
         />
       </label>
 
-      {message ? (
-        <div className="rounded-lg border border-foreground/20 bg-background/60 px-3 py-2 text-xs text-foreground">
-          {message}
-        </div>
-      ) : null}
+      <div className="min-h-[44px]">
+        {message ? (
+          <div
+            className={`rounded-lg border px-3 py-2 text-xs ${
+              message.variant === "error"
+                ? "border-red-300 bg-red-50 text-red-600"
+                : "border-emerald-200 bg-emerald-50 text-emerald-600"
+            }`}
+          >
+            {message.text}
+          </div>
+        ) : null}
+      </div>
 
       <button
         type="submit"

@@ -11,6 +11,12 @@ export function NavBar() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
+  const role = (user?.role || "").toLowerCase();
+  const normalizedScope = (scope || "").toLowerCase();
+  const isRegularRole = role === "" || role === "standard";
+  const isRegularScope = normalizedScope === "" || normalizedScope === "user";
+  const canSeeUpload = !(isRegularRole && isRegularScope);
+
   const handleLogout = async () => {
     setBusy(true);
     try {
@@ -25,9 +31,11 @@ export function NavBar() {
     <nav className="flex items-center gap-3 text-sm">
       {accessToken ? (
         <>
-          <Link className="hover:underline" href="/upload">
-            Upload
-          </Link>
+          {canSeeUpload ? (
+            <Link className="hover:underline" href="/upload">
+              Upload
+            </Link>
+          ) : null}
           {scope === "admin" ? (
             <Link className="hover:underline" href="/adminmanagement">
               Admin
