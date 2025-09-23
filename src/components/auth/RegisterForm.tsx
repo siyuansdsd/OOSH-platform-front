@@ -37,14 +37,15 @@ export function RegisterForm() {
     }
     setMessage(null);
     setSendingCode(true);
+    setCooldown(60);
     try {
       await sendCode(email.trim(), { purpose: "register" });
       setMessage({
         text: "Verification code sent. It expires in 5 minutes.",
         variant: "success",
       });
-      setCooldown(60);
     } catch {
+      setCooldown(0);
       setMessage({ text: "Email verification failed.", variant: "error" });
     } finally {
       setSendingCode(false);
@@ -104,13 +105,9 @@ export function RegisterForm() {
             type="button"
             onClick={handleSendCode}
             disabled={sendingCode || cooldown > 0}
-            className="whitespace-nowrap rounded-lg border border-foreground/20 px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
+            className="min-w-[7.5rem] whitespace-nowrap rounded-lg border border-transparent bg-gradient-to-r from-orange-500/80 via-white/70 to-blue-500/70 px-3 py-2 text-sm font-medium text-foreground shadow-sm backdrop-blur disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {sendingCode
-              ? "Sending…"
-              : cooldown > 0
-              ? `${cooldown}s`
-              : "Send code"}
+            {cooldown > 0 ? `${cooldown}s` : sendingCode ? "Sending" : "Verify"}
           </button>
         </div>
       </label>

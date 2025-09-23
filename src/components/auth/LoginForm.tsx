@@ -33,13 +33,14 @@ export function LoginForm({ isAdmin }: LoginFormProps) {
     }
     setMessage(null);
     setSendingCode(true);
+    setCooldown(60);
     try {
       await sendCode(email.trim(), {
         password: isAdmin ? password : undefined,
       });
       setMessage({ text: "Verification code sent. It expires in 5 minutes.", variant: "success" });
-      setCooldown(60);
     } catch {
+      setCooldown(0);
       setMessage({ text: "Email verification failed.", variant: "error" });
     } finally {
       setSendingCode(false);
@@ -87,9 +88,9 @@ export function LoginForm({ isAdmin }: LoginFormProps) {
               type="button"
               onClick={handleSendCode}
               disabled={sendingCode || cooldown > 0}
-              className="whitespace-nowrap rounded-lg border border-foreground/20 px-3 py-2 text-sm font-medium disabled:cursor-not-allowed disabled:opacity-60"
+              className="min-w-[7.5rem] whitespace-nowrap rounded-lg border border-transparent bg-gradient-to-r from-orange-500/80 via-white/70 to-blue-500/70 px-3 py-2 text-sm font-medium text-foreground shadow-sm backdrop-blur disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {sendingCode ? "Sending…" : cooldown > 0 ? `${cooldown}s` : "Verify"}
+              {cooldown > 0 ? `${cooldown}s` : sendingCode ? "Sending" : "Verify"}
             </button>
           </div>
         </label>
@@ -136,7 +137,7 @@ export function LoginForm({ isAdmin }: LoginFormProps) {
       <button
         type="submit"
         disabled={submitting}
-        className="w-full rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background disabled:cursor-not-allowed disabled:opacity-60"
+        className="w-full rounded-lg border border-transparent bg-gradient-to-r from-orange-500/85 via-white/80 to-blue-500/80 px-4 py-2 text-sm font-semibold text-foreground shadow-lg backdrop-blur transition hover:from-orange-500/95 hover:via-white/90 hover:to-blue-500/90 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {submitting ? "Signing in…" : isAdmin ? "Admin Login" : "Login"}
       </button>

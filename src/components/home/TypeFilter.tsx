@@ -35,10 +35,10 @@ export function TypeFilter({ value, onChange, className = "" }: TypeFilterProps)
               key={option.value}
               type="button"
               onClick={() => handleSelect(option.value)}
-              className={`min-w-[8rem] rounded-lg px-4 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-foreground/30 focus:ring-offset-1 focus:ring-offset-background md:px-6 md:py-2.5 ${
+              className={`min-w-[8rem] rounded-lg px-4 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-orange-300/70 focus:ring-offset-1 focus:ring-offset-background md:px-6 md:py-2.5 ${
                 active
-                  ? "bg-foreground text-background shadow"
-                  : "bg-transparent text-foreground/80 hover:bg-foreground/10"
+                  ? "border border-transparent bg-gradient-to-r from-orange-500/85 via-white/80 to-blue-500/80 text-foreground shadow-lg backdrop-blur"
+                  : "border border-transparent bg-white/10 text-foreground/80 hover:bg-white/20 hover:text-foreground"
               }`}
             >
               {option.label}
