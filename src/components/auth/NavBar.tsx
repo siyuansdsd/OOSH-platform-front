@@ -43,7 +43,13 @@ export function NavBar() {
             href="/profile"
             className="hidden sm:inline text-foreground/60 hover:underline"
           >
-            {user?.display_name || user?.username || user?.email}
+            {typeof user?.display_name === "string" && user.display_name
+              ? user.display_name
+              : typeof user?.username === "string" && user.username
+              ? user.username
+              : typeof user?.email === "string"
+              ? user.email
+              : "Profile"}
           </Link>
           <button
             type="button"
