@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { registerUser, type RegisterInput } from "@/lib/auth/api";
+import { APPROVED_SCHOOLS } from "@/constants/schools";
 import { BRAND_LOGO_URL, BRAND_NAME } from "@/constants/branding";
 
 export function RegisterForm() {
@@ -172,11 +173,18 @@ export function RegisterForm() {
 
       <label className="flex flex-col gap-1 text-sm text-foreground/80">
         Children school
-        <input
+        <select
           value={childrenSchool}
           onChange={(e) => setChildrenSchool(e.target.value)}
           className="rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
-        />
+        >
+          <option value="">Select a school</option>
+          {APPROVED_SCHOOLS.map((school) => (
+            <option key={school} value={school}>
+              {school}
+            </option>
+          ))}
+        </select>
       </label>
 
       <label className="flex flex-col gap-1 text-sm text-foreground/80">

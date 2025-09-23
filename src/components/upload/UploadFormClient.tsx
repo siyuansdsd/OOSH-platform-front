@@ -11,6 +11,7 @@ import {
   type UploadMode,
 } from "./UploadContext";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { APPROVED_SCHOOLS } from "@/constants/schools";
 
 const EN_NAME = /^[A-Za-z ]+$/;
 
@@ -102,7 +103,9 @@ export default function UploadFormClient() {
       else if (!EN_NAME.test(trimmed))
         e[key] = `${label} must be English letters and spaces only`;
     };
-    check("schoolName", schoolName, "School Name");
+    if (!APPROVED_SCHOOLS.includes(schoolName)) {
+      e.schoolName = "Select a school from the list";
+    }
     if (!title.trim()) e.title = "Title is required";
     if (!description.trim()) e.description = "Description is required";
 
@@ -567,14 +570,19 @@ function TraditionalFields() {
 
       <label className="block">
         <div className="mb-1 text-sm text-foreground/80">School Name</div>
-        <input
+        <select
           value={schoolName}
           onChange={(e) => setSchoolName(e.target.value)}
-          onBlur={(e) => setSchoolName(e.target.value.trim())}
           disabled={disabled}
-          className={baseInput}
-          placeholder="Enter school name (English only)"
-        />
+          className={`${baseInput} bg-white/80 dark:bg-black/40`}
+        >
+          <option value="">Select a school</option>
+          {APPROVED_SCHOOLS.map((school) => (
+            <option key={school} value={school}>
+              {school}
+            </option>
+          ))}
+        </select>
         <FieldError message={errors.schoolName} className="mt-1" />
       </label>
 
