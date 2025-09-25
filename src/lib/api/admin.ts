@@ -171,9 +171,13 @@ export async function updateAdminUser(
   payload: Partial<UserItem>,
   token: string
 ) {
-  return send<UserItem>(`/api/users/${id}`, {
-    method: "PUT",
-    body: JSON.stringify(payload),
+  return send<UserItem>(`/api/users`, {
+    method: "POST",
+    body: JSON.stringify({
+      action: "update",
+      id: id,
+      ...payload,
+    }),
     headers: {
       Authorization: `Bearer ${token}`,
     },
