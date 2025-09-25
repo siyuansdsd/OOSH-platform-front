@@ -211,7 +211,12 @@ export async function createTemporaryAccount(
 ) {
   return send<UserItem>(`/api/users`, {
     method: "POST",
-    body: JSON.stringify({ action: "createTemporary", ...input }),
+    // include role explicitly to ensure backend creates a temporary user
+    body: JSON.stringify({
+      action: "createTemporary",
+      role: "temporary",
+      ...input,
+    }),
     headers: {
       Authorization: `Bearer ${token}`,
     },
