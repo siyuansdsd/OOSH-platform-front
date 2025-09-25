@@ -417,9 +417,6 @@ export function AdminManagementClient() {
         {record.last_failed_login_at || "—"}
       </td>
       <td className="px-3 py-3 text-sm text-foreground/70">
-        {record.entityType || "—"}
-      </td>
-      <td className="px-3 py-3 text-sm text-foreground/70">
         <button
           type="button"
           onClick={() => toggleUserExpanded(record.id)}
@@ -557,7 +554,6 @@ export function AdminManagementClient() {
                 <th className="px-3 py-3">Last Login</th>
                 <th className="px-3 py-3">Failed Attempts</th>
                 <th className="px-3 py-3">Last Failed Login</th>
-                <th className="px-3 py-3">Entity Type</th>
                 <th className="px-3 py-3">Details</th>
               </tr>
             )}
@@ -566,7 +562,7 @@ export function AdminManagementClient() {
             {loading ? (
               <tr>
                 <td
-                  colSpan={view === "homeworks" ? 10 : 12}
+                  colSpan={view === "homeworks" ? 10 : 11}
                   className="px-3 py-6 text-center text-foreground/60"
                 >
                   Loading…
@@ -575,7 +571,7 @@ export function AdminManagementClient() {
             ) : filteredRecords.length === 0 ? (
               <tr>
                 <td
-                  colSpan={view === "homeworks" ? 10 : 12}
+                  colSpan={view === "homeworks" ? 10 : 11}
                   className="px-3 py-6 text-center text-foreground/60"
                 >
                   No records found.
@@ -591,7 +587,7 @@ export function AdminManagementClient() {
                 const detailsRow = (
                   <tr key={`${record.id}-details`} className="bg-background/5">
                     <td
-                      colSpan={12}
+                      colSpan={11}
                       className="px-3 py-3 text-sm text-foreground/70"
                     >
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-6xl">
