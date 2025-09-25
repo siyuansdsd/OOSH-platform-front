@@ -183,7 +183,7 @@ export function AdminManagementClient() {
           email: editing.draft.email,
           role: editing.draft.role,
           blocked: editing.draft.blocked,
-          entityType: editing.draft.entityType,
+          display_name: editing.draft.display_name,
         };
         await updateAdminUser(editing.draft.id, payload, accessToken);
         await loadData("users");
@@ -497,7 +497,7 @@ export function AdminManagementClient() {
                 onClick={() => void handleBulkAction("disable")}
                 className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Disable selected
+                Block selected accounts
               </button>
               <button
                 type="button"
@@ -505,7 +505,7 @@ export function AdminManagementClient() {
                 onClick={() => void handleBulkAction("ban")}
                 className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Ban selected
+                Forever delete selected
               </button>
               <button
                 type="button"
@@ -513,7 +513,7 @@ export function AdminManagementClient() {
                 onClick={() => void handleBulkAction("enable")}
                 className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
               >
-                Enable selected
+                Unblock selected accounts
               </button>
             </div>
           )}
@@ -1083,12 +1083,12 @@ export function AdminManagementClient() {
                       )
                     }
                   />
-                  Blocked
+                  Block account
                 </label>
                 <label className="text-sm text-foreground/80">
-                  Entity Type
+                  Display Name
                   <input
-                    value={editingUser.entityType || ""}
+                    value={editingUser.display_name || ""}
                     onChange={(e) =>
                       setEditing((prev) =>
                         prev && prev.type === "users"
@@ -1097,7 +1097,7 @@ export function AdminManagementClient() {
                               original: prev.original,
                               draft: {
                                 ...prev.draft,
-                                entityType: e.target.value,
+                                display_name: e.target.value,
                               },
                             }
                           : prev
