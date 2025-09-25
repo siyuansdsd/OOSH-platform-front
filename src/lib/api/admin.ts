@@ -93,14 +93,14 @@ export async function fetchAdminHomeworks(
 export async function fetchAdminUsers(
   params: Record<string, string | number | undefined> = {},
   token?: string
-) {
+) : Promise<PaginatedResult<AdminUserRecord> | AdminUserRecord[]> {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== "") {
       search.set(key, String(value));
     }
   });
-  return send<PaginatedResult<AdminUserRecord>>(
+  return send<PaginatedResult<AdminUserRecord> | AdminUserRecord[]>(
     `/api/users${search.toString() ? `?${search}` : ""}`,
     token
       ? {

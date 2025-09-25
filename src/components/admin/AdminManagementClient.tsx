@@ -66,7 +66,12 @@ export function AdminManagementClient() {
         setHomeworks(res.items);
       } else {
         const res = await fetchAdminUsers({}, accessToken);
-        setUsers(res.items);
+        const list = Array.isArray(res)
+          ? res
+          : Array.isArray(res.items)
+          ? res.items
+          : [];
+        setUsers(list as AdminUserRecord[]);
       }
     } catch (err: any) {
       setError(err?.message || "Failed to load data");
