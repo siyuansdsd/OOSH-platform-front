@@ -101,7 +101,7 @@ export async function fetchAdminUsers(
     }
   });
   return send<PaginatedResult<AdminUserRecord>>(
-    `/api/admin/users${search.toString() ? `?${search}` : ""}`,
+    `/api/users${search.toString() ? `?${search}` : ""}`,
     token
       ? {
           headers: {
@@ -166,7 +166,7 @@ export async function updateAdminUser(
   payload: Partial<AdminUserRecord>,
   token: string
 ) {
-  return send<AdminUserRecord>(`/api/admin/users/${id}`, {
+  return send<AdminUserRecord>(`/api/users/${id}`, {
     method: "PUT",
     body: JSON.stringify(payload),
     headers: {
@@ -182,7 +182,7 @@ export async function bulkUpdateAdminUsers(
   },
   token: string
 ) {
-  return send<{ updated: string[] }>(`/api/admin/users`, {
+  return send<{ updated: string[] }>(`/api/users`, {
     method: "POST",
     body: JSON.stringify(payload),
     headers: {
@@ -200,7 +200,7 @@ export async function createTemporaryAccount(
   input: CreateTemporaryAccountInput,
   token: string
 ) {
-  return send<AdminUserRecord>(`/api/admin/users`, {
+  return send<AdminUserRecord>(`/api/users`, {
     method: "POST",
     body: JSON.stringify({ action: "createTemporary", ...input }),
     headers: {
@@ -217,7 +217,7 @@ export async function createEmployerAccounts(
   input: CreateEmployerAccountsInput,
   token: string
 ) {
-  return send<{ created: string[] }>(`/api/admin/users`, {
+  return send<{ created: string[] }>(`/api/users`, {
     method: "POST",
     body: JSON.stringify({ action: "createEmployerBatch", ...input }),
     headers: {

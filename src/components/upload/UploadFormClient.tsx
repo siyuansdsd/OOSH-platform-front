@@ -401,13 +401,12 @@ export default function UploadFormClient() {
           }
         );
         if (!writeRes.ok) {
-          const text = await writeRes.text();
-          let msg = text || `HTTP ${writeRes.status}`;
-          try {
-            const obj = JSON.parse(text);
-            msg = obj?.message || obj?.error || msg;
-          } catch {}
-          throw new Error(msg);
+          const text = await writeRes.text().catch(() => "");
+          console.error("Homework update failed", {
+            status: writeRes.status,
+            body: text,
+          });
+          throw new Error(`HTTP ${writeRes.status}`);
         }
       } else {
         // URL-only flow: direct POST
@@ -432,13 +431,12 @@ export default function UploadFormClient() {
           body: JSON.stringify(payload),
         });
         if (!res.ok) {
-          const text = await res.text();
-          let msg = text || `HTTP ${res.status}`;
-          try {
-            const obj = JSON.parse(text);
-            msg = obj?.message || obj?.error || msg;
-          } catch {}
-          throw new Error(msg);
+          const text = await res.text().catch(() => "");
+          console.error("Homework create failed", {
+            status: res.status,
+            body: text,
+          });
+          throw new Error(`HTTP ${res.status}`);
         }
       }
 
