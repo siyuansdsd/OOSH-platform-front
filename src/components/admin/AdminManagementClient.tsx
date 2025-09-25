@@ -411,6 +411,12 @@ export function AdminManagementClient() {
         {record.last_login || "—"}
       </td>
       <td className="px-3 py-3 text-sm text-foreground/70">
+        {record.failed_login_attempts || "0"}
+      </td>
+      <td className="whitespace-nowrap px-3 py-3 text-xs text-foreground/50">
+        {record.last_failed_login_at || "—"}
+      </td>
+      <td className="px-3 py-3 text-sm text-foreground/70">
         {record.entityType || "—"}
       </td>
       <td className="px-3 py-3 text-sm text-foreground/70">
@@ -543,12 +549,15 @@ export function AdminManagementClient() {
               <tr>
                 <th className="px-3 py-3">Select</th>
                 <th className="px-3 py-3">Username</th>
+                <th className="px-3 py-3">Display Name</th>
                 <th className="px-3 py-3">Email</th>
                 <th className="px-3 py-3">Role</th>
                 <th className="px-3 py-3">Status</th>
                 <th className="px-3 py-3">Created</th>
                 <th className="px-3 py-3">Last Login</th>
-                <th className="px-3 py-3">Notes</th>
+                <th className="px-3 py-3">Failed Attempts</th>
+                <th className="px-3 py-3">Last Failed Login</th>
+                <th className="px-3 py-3">Entity Type</th>
                 <th className="px-3 py-3">Details</th>
               </tr>
             )}
@@ -557,7 +566,7 @@ export function AdminManagementClient() {
             {loading ? (
               <tr>
                 <td
-                  colSpan={view === "homeworks" ? 10 : 9}
+                  colSpan={view === "homeworks" ? 10 : 12}
                   className="px-3 py-6 text-center text-foreground/60"
                 >
                   Loading…
@@ -566,7 +575,7 @@ export function AdminManagementClient() {
             ) : filteredRecords.length === 0 ? (
               <tr>
                 <td
-                  colSpan={view === "homeworks" ? 10 : 9}
+                  colSpan={view === "homeworks" ? 10 : 12}
                   className="px-3 py-6 text-center text-foreground/60"
                 >
                   No records found.
@@ -582,11 +591,15 @@ export function AdminManagementClient() {
                 const detailsRow = (
                   <tr key={`${record.id}-details`} className="bg-background/5">
                     <td
-                      colSpan={9}
+                      colSpan={12}
                       className="px-3 py-3 text-xs text-foreground/70"
                     >
                       <pre className="whitespace-pre-wrap break-words text-[12px]">
-                        {JSON.stringify(record, null, 2)}
+                        {JSON.stringify(
+                          (({ PK, SK, id, ...filtered }) => filtered)(record),
+                          null,
+                          2
+                        )}
                       </pre>
                     </td>
                   </tr>
