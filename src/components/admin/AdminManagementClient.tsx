@@ -5,8 +5,8 @@ import {
   fetchAdminHomeworks,
   fetchAdminUsers,
   type AdminHomeworkRecord,
-  type AdminUserRecord,
-  type AdminUserRole,
+  type UserItem,
+  type Role,
   type AdminUserStatus,
   updateAdminHomework,
   deleteAdminHomeworks,
@@ -25,8 +25,12 @@ interface EmployerDraft {
 type ViewMode = "homeworks" | "users";
 
 type EditingItem =
-  | { type: "homeworks"; original: AdminHomeworkRecord; draft: AdminHomeworkRecord }
-  | { type: "users"; original: AdminUserRecord; draft: AdminUserRecord };
+  | {
+      type: "homeworks";
+      original: AdminHomeworkRecord;
+      draft: AdminHomeworkRecord;
+    }
+  | { type: "users"; original: UserItem; draft: UserItem };
 
 const linkClass = "font-semibold italic underline";
 
@@ -34,7 +38,7 @@ export function AdminManagementClient() {
   const { accessToken } = useAuth();
   const [view, setView] = useState<ViewMode>("homeworks");
   const [homeworks, setHomeworks] = useState<AdminHomeworkRecord[]>([]);
-  const [users, setUsers] = useState<AdminUserRecord[]>([]);
+  const [users, setUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -42,7 +46,10 @@ export function AdminManagementClient() {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
 
-  const [tempAccount, setTempAccount] = useState({ username: "", password: "" });
+  const [tempAccount, setTempAccount] = useState({
+    username: "",
+    password: "",
+  });
   const [creatingTemp, setCreatingTemp] = useState(false);
 
   const [employerDrafts, setEmployerDrafts] = useState<EmployerDraft[]>([
@@ -52,9 +59,21 @@ export function AdminManagementClient() {
 
   useEffect(() => {
     if (!accessToken) return;
+    // Load data once when we obtain an access token. We intentionally do NOT
+    // reload when switching `view` so the previous search/results are reused
+    // until the user explicitly clicks Refresh.
     void loadData(view);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, accessToken]);
+  }, [accessToken]);
+
+  // track which user rows are expanded to show full record details
+  const [expandedUserIds, setExpandedUserIds] = useState<string[]>([]);
+
+  const toggleUserExpanded = (id: string) => {
+    setExpandedUserIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
 
   async function loadData(mode: ViewMode) {
     setLoading(true);
@@ -71,7 +90,7 @@ export function AdminManagementClient() {
           : Array.isArray(res.items)
           ? res.items
           : [];
-        setUsers(list as AdminUserRecord[]);
+        setUsers(list as UserItem[]);
       }
     } catch (err: any) {
       setError(err?.message || "Failed to load data");
@@ -102,13 +121,13 @@ export function AdminManagementClient() {
         return haystack.includes(term);
       });
     }
-    return (activeRecords as AdminUserRecord[]).filter((item) => {
+    return (activeRecords as UserItem[]).filter((item) => {
       const haystack = [
         item.username,
+        item.display_name,
         item.email,
-        item.role,
-        item.status,
-        item.notes,
+        String(item.role),
+        String(item.blocked),
       ]
         .filter(Boolean)
         .join(" ")
@@ -125,7 +144,9 @@ export function AdminManagementClient() {
 
   const toggleSelectAll = () => {
     const displayed = filteredRecords.map((item) => item.id);
-    const displayedSelected = selectedIds.filter((id) => displayed.includes(id));
+    const displayedSelected = selectedIds.filter((id) =>
+      displayed.includes(id)
+    );
     if (displayedSelected.length === displayed.length) {
       setSelectedIds((prev) => prev.filter((id) => !displayed.includes(id)));
     } else {
@@ -141,7 +162,7 @@ export function AdminManagementClient() {
     });
   };
 
-  const openUserEditor = (record: AdminUserRecord) => {
+  const openUserEditor = (record: UserItem) => {
     setEditing({
       type: "users",
       original: record,
@@ -161,8 +182,8 @@ export function AdminManagementClient() {
         const payload = {
           email: editing.draft.email,
           role: editing.draft.role,
-          status: editing.draft.status,
-          notes: editing.draft.notes,
+          blocked: editing.draft.blocked,
+          entityType: editing.draft.entityType,
         };
         await updateAdminUser(editing.draft.id, payload, accessToken);
         await loadData("users");
@@ -175,7 +196,9 @@ export function AdminManagementClient() {
     }
   };
 
-  const handleBulkAction = async (action: "delete" | "disable" | "ban" | "enable") => {
+  const handleBulkAction = async (
+    action: "delete" | "disable" | "ban" | "enable"
+  ) => {
     if (selectedIds.length === 0) return;
     try {
       if (!accessToken) throw new Error("Not authenticated");
@@ -230,7 +253,8 @@ export function AdminManagementClient() {
   );
 
   const temporaryUsers = useMemo(
-    () => users.filter((user) => (user.role || "").toLowerCase() === "temporary"),
+    () =>
+      users.filter((user) => (user.role || "").toLowerCase() === "temporary"),
     [users]
   );
 
@@ -238,14 +262,17 @@ export function AdminManagementClient() {
     () =>
       users.filter((user) => {
         const role = (user.role || "").toLowerCase();
-        const scopeValue = (user.scope || "").toLowerCase();
-        return role === "editor" || scopeValue === "admin";
+        const type = (user.entityType || "").toLowerCase();
+        return role === "editor" || type === "admin" || role === "admin";
       }),
     [users]
   );
 
   const renderHomeworkRow = (record: AdminHomeworkRecord) => (
-    <tr key={record.id} className="border-b border-foreground/10 hover:bg-foreground/5">
+    <tr
+      key={record.id}
+      className="border-b border-foreground/10 hover:bg-foreground/5"
+    >
       <td className="whitespace-nowrap px-3 py-3">
         <div className="flex items-center gap-3">
           <input
@@ -263,13 +290,19 @@ export function AdminManagementClient() {
           </button>
         </div>
       </td>
-      <td className="px-3 py-3 text-sm font-medium text-foreground">{record.title || "Untitled"}</td>
-      <td className="px-3 py-3 text-sm text-foreground/70">{record.schoolName || "—"}</td>
+      <td className="px-3 py-3 text-sm font-medium text-foreground">
+        {record.title || "Untitled"}
+      </td>
+      <td className="px-3 py-3 text-sm text-foreground/70">
+        {record.schoolName || "—"}
+      </td>
       <td className="px-3 py-3 text-sm text-foreground/70">
         {record.personName || record.groupName || "—"}
       </td>
       <td className="px-3 py-3 text-sm text-foreground/70">
-        {record.members && record.members.length > 0 ? record.members.join(", ") : "—"}
+        {record.members && record.members.length > 0
+          ? record.members.join(", ")
+          : "—"}
       </td>
       <td className="px-3 py-3 text-sm">
         <div className="flex max-w-xs flex-col gap-1 break-all whitespace-normal">
@@ -328,8 +361,11 @@ export function AdminManagementClient() {
     </tr>
   );
 
-  const renderUserRow = (record: AdminUserRecord) => (
-    <tr key={record.id} className="border-b border-foreground/10 hover:bg-foreground/5">
+  const renderUserRow = (record: UserItem) => (
+    <tr
+      key={record.id}
+      className="border-b border-foreground/10 hover:bg-foreground/5"
+    >
       <td className="whitespace-nowrap px-3 py-3">
         <div className="flex items-center gap-3">
           <input
@@ -347,7 +383,12 @@ export function AdminManagementClient() {
           </button>
         </div>
       </td>
-      <td className="px-3 py-3 text-sm font-medium text-foreground">{record.username}</td>
+      <td className="px-3 py-3 text-sm font-medium text-foreground">
+        {record.username}
+      </td>
+      <td className="px-3 py-3 text-sm text-foreground/70">
+        {record.display_name || "—"}
+      </td>
       <td className="px-3 py-3 text-sm text-foreground/70">
         {record.email ? (
           <a href={`mailto:${record.email}`} className={linkClass}>
@@ -357,15 +398,30 @@ export function AdminManagementClient() {
           "—"
         )}
       </td>
-      <td className="px-3 py-3 text-sm capitalize text-foreground">{record.role}</td>
-      <td className="px-3 py-3 text-sm capitalize text-foreground/70">{record.status}</td>
-      <td className="whitespace-nowrap px-3 py-3 text-xs text-foreground/50">
-        {record.createdAt || "—"}
+      <td className="px-3 py-3 text-sm capitalize text-foreground">
+        {record.role}
+      </td>
+      <td className="px-3 py-3 text-sm capitalize text-foreground/70">
+        {record.blocked ? "Blocked" : "Active"}
       </td>
       <td className="whitespace-nowrap px-3 py-3 text-xs text-foreground/50">
-        {record.lastLoginAt || "—"}
+        {record.created_at || "—"}
       </td>
-      <td className="px-3 py-3 text-sm text-foreground/70">{record.notes || "—"}</td>
+      <td className="whitespace-nowrap px-3 py-3 text-xs text-foreground/50">
+        {record.last_login || "—"}
+      </td>
+      <td className="px-3 py-3 text-sm text-foreground/70">
+        {record.entityType || "—"}
+      </td>
+      <td className="px-3 py-3 text-sm text-foreground/70">
+        <button
+          type="button"
+          onClick={() => toggleUserExpanded(record.id)}
+          className="rounded-lg border border-foreground/15 px-2 py-1 text-xs"
+        >
+          {expandedUserIds.includes(record.id) ? "Hide" : "Details"}
+        </button>
+      </td>
     </tr>
   );
 
@@ -493,26 +549,50 @@ export function AdminManagementClient() {
                 <th className="px-3 py-3">Created</th>
                 <th className="px-3 py-3">Last Login</th>
                 <th className="px-3 py-3">Notes</th>
+                <th className="px-3 py-3">Details</th>
               </tr>
             )}
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={view === "homeworks" ? 10 : 8} className="px-3 py-6 text-center text-foreground/60">
+                <td
+                  colSpan={view === "homeworks" ? 10 : 9}
+                  className="px-3 py-6 text-center text-foreground/60"
+                >
                   Loading…
                 </td>
               </tr>
             ) : filteredRecords.length === 0 ? (
               <tr>
-                <td colSpan={view === "homeworks" ? 10 : 8} className="px-3 py-6 text-center text-foreground/60">
+                <td
+                  colSpan={view === "homeworks" ? 10 : 9}
+                  className="px-3 py-6 text-center text-foreground/60"
+                >
                   No records found.
                 </td>
               </tr>
             ) : view === "homeworks" ? (
               (filteredRecords as AdminHomeworkRecord[]).map(renderHomeworkRow)
             ) : (
-              (filteredRecords as AdminUserRecord[]).map(renderUserRow)
+              // For users, render the main row and optionally a details row
+              (filteredRecords as UserItem[]).flatMap((record) => {
+                const main = renderUserRow(record);
+                if (!expandedUserIds.includes(record.id)) return [main];
+                const detailsRow = (
+                  <tr key={`${record.id}-details`} className="bg-background/5">
+                    <td
+                      colSpan={9}
+                      className="px-3 py-3 text-xs text-foreground/70"
+                    >
+                      <pre className="whitespace-pre-wrap break-words text-[12px]">
+                        {JSON.stringify(record, null, 2)}
+                      </pre>
+                    </td>
+                  </tr>
+                );
+                return [main, detailsRow];
+              })
             )}
           </tbody>
         </table>
@@ -520,7 +600,9 @@ export function AdminManagementClient() {
 
       <section className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6">
-          <h2 className="text-lg font-semibold text-foreground">Temporary accounts</h2>
+          <h2 className="text-lg font-semibold text-foreground">
+            Temporary accounts
+          </h2>
           <p className="mt-1 text-sm text-foreground/60">
             Quickly generate temporary login credentials.
           </p>
@@ -529,7 +611,12 @@ export function AdminManagementClient() {
               Username
               <input
                 value={tempAccount.username}
-                onChange={(e) => setTempAccount((prev) => ({ ...prev, username: e.target.value }))}
+                onChange={(e) =>
+                  setTempAccount((prev) => ({
+                    ...prev,
+                    username: e.target.value,
+                  }))
+                }
                 className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
               />
             </label>
@@ -537,7 +624,12 @@ export function AdminManagementClient() {
               Password
               <input
                 value={tempAccount.password}
-                onChange={(e) => setTempAccount((prev) => ({ ...prev, password: e.target.value }))}
+                onChange={(e) =>
+                  setTempAccount((prev) => ({
+                    ...prev,
+                    password: e.target.value,
+                  }))
+                }
                 className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
                 type="password"
               />
@@ -554,7 +646,9 @@ export function AdminManagementClient() {
         </div>
 
         <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6">
-          <h2 className="text-lg font-semibold text-foreground">Employer invitations</h2>
+          <h2 className="text-lg font-semibold text-foreground">
+            Employer invitations
+          </h2>
           <p className="mt-1 text-sm text-foreground/60">
             Add employer accounts in bulk by email and password.
           </p>
@@ -580,7 +674,10 @@ export function AdminManagementClient() {
                     value={draft.password}
                     onChange={(e) => {
                       const next = [...employerDrafts];
-                      next[index] = { ...next[index], password: e.target.value };
+                      next[index] = {
+                        ...next[index],
+                        password: e.target.value,
+                      };
                       setEmployerDrafts(next);
                     }}
                     className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
@@ -592,7 +689,12 @@ export function AdminManagementClient() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setEmployerDrafts((prev) => [...prev, { email: "", password: "" }])}
+                onClick={() =>
+                  setEmployerDrafts((prev) => [
+                    ...prev,
+                    { email: "", password: "" },
+                  ])
+                }
                 className="rounded-lg border border-foreground/20 px-3 py-1 text-xs font-medium"
               >
                 + Add row
@@ -601,7 +703,9 @@ export function AdminManagementClient() {
                 <button
                   type="button"
                   onClick={() =>
-                    setEmployerDrafts((prev) => prev.slice(0, Math.max(1, prev.length - 1)))
+                    setEmployerDrafts((prev) =>
+                      prev.slice(0, Math.max(1, prev.length - 1))
+                    )
                   }
                   className="rounded-lg border border-foreground/20 px-3 py-1 text-xs font-medium"
                 >
@@ -623,30 +727,42 @@ export function AdminManagementClient() {
 
       <section className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6">
-          <h2 className="text-lg font-semibold text-foreground">Temporary accounts</h2>
+          <h2 className="text-lg font-semibold text-foreground">
+            Temporary accounts
+          </h2>
           {temporaryUsers.length === 0 ? (
-            <p className="mt-2 text-sm text-foreground/60">No temporary accounts created yet.</p>
+            <p className="mt-2 text-sm text-foreground/60">
+              No temporary accounts created yet.
+            </p>
           ) : (
             <ul className="mt-4 space-y-2 text-sm text-foreground/80">
               {temporaryUsers.map((user) => (
                 <li key={user.id} className="truncate">
                   <span className="font-medium">{user.username}</span>
-                  {user.email ? <span className="text-foreground/60"> · {user.email}</span> : null}
+                  {user.email ? (
+                    <span className="text-foreground/60"> · {user.email}</span>
+                  ) : null}
                 </li>
               ))}
             </ul>
           )}
         </div>
         <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6">
-          <h2 className="text-lg font-semibold text-foreground">Editor / Admin accounts</h2>
+          <h2 className="text-lg font-semibold text-foreground">
+            Editor / Admin accounts
+          </h2>
           {editorUsers.length === 0 ? (
-            <p className="mt-2 text-sm text-foreground/60">No editor accounts found.</p>
+            <p className="mt-2 text-sm text-foreground/60">
+              No editor accounts found.
+            </p>
           ) : (
             <ul className="mt-4 space-y-2 text-sm text-foreground/80">
               {editorUsers.map((user) => (
                 <li key={user.id} className="truncate">
                   <span className="font-medium">{user.username}</span>
-                  {user.email ? <span className="text-foreground/60"> · {user.email}</span> : null}
+                  {user.email ? (
+                    <span className="text-foreground/60"> · {user.email}</span>
+                  ) : null}
                   <span className="text-foreground/50"> · {user.role}</span>
                 </li>
               ))}
@@ -700,7 +816,10 @@ export function AdminManagementClient() {
                           ? {
                               type: "homeworks",
                               original: prev.original,
-                              draft: { ...prev.draft, description: e.target.value },
+                              draft: {
+                                ...prev.draft,
+                                description: e.target.value,
+                              },
                             }
                           : prev
                       )
@@ -719,7 +838,10 @@ export function AdminManagementClient() {
                           ? {
                               type: "homeworks",
                               original: prev.original,
-                              draft: { ...prev.draft, schoolName: e.target.value },
+                              draft: {
+                                ...prev.draft,
+                                schoolName: e.target.value,
+                              },
                             }
                           : prev
                       )
@@ -738,7 +860,10 @@ export function AdminManagementClient() {
                             ? {
                                 type: "homeworks",
                                 original: prev.original,
-                                draft: { ...prev.draft, groupName: e.target.value },
+                                draft: {
+                                  ...prev.draft,
+                                  groupName: e.target.value,
+                                },
                               }
                             : prev
                         )
@@ -756,7 +881,10 @@ export function AdminManagementClient() {
                             ? {
                                 type: "homeworks",
                                 original: prev.original,
-                                draft: { ...prev.draft, personName: e.target.value },
+                                draft: {
+                                  ...prev.draft,
+                                  personName: e.target.value,
+                                },
                               }
                             : prev
                         )
@@ -801,7 +929,9 @@ export function AdminManagementClient() {
                             original: prev.original,
                             draft: {
                               ...prev.draft,
-                              images: prev.draft.images.filter((item) => item !== url),
+                              images: prev.draft.images.filter(
+                                (item) => item !== url
+                              ),
                             },
                           }
                         : prev
@@ -819,7 +949,9 @@ export function AdminManagementClient() {
                             original: prev.original,
                             draft: {
                               ...prev.draft,
-                              videos: prev.draft.videos.filter((item) => item !== url),
+                              videos: prev.draft.videos.filter(
+                                (item) => item !== url
+                              ),
                             },
                           }
                         : prev
@@ -837,7 +969,9 @@ export function AdminManagementClient() {
                             original: prev.original,
                             draft: {
                               ...prev.draft,
-                              urls: prev.draft.urls.filter((item) => item !== url),
+                              urls: prev.draft.urls.filter(
+                                (item) => item !== url
+                              ),
                             },
                           }
                         : prev
@@ -879,7 +1013,7 @@ export function AdminManagementClient() {
                               original: prev.original,
                               draft: {
                                 ...prev.draft,
-                                role: e.target.value as AdminUserRole,
+                                role: e.target.value as Role,
                               },
                             }
                           : prev
@@ -893,10 +1027,10 @@ export function AdminManagementClient() {
                     <option value="employer">Employer</option>
                   </select>
                 </label>
-                <label className="text-sm text-foreground/80">
-                  Status
-                  <select
-                    value={editingUser.status}
+                <label className="text-sm text-foreground/80 flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    checked={!!editingUser.blocked}
                     onChange={(e) =>
                       setEditing((prev) =>
                         prev && prev.type === "users"
@@ -905,36 +1039,34 @@ export function AdminManagementClient() {
                               original: prev.original,
                               draft: {
                                 ...prev.draft,
-                                status: e.target.value as AdminUserStatus,
+                                blocked: e.target.checked,
                               },
                             }
                           : prev
                       )
                     }
-                    className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
-                  >
-                    <option value="active">Active</option>
-                    <option value="disabled">Disabled</option>
-                    <option value="banned">Banned</option>
-                  </select>
+                  />
+                  Blocked
                 </label>
                 <label className="text-sm text-foreground/80">
-                  Notes
-                  <textarea
-                    value={editingUser.notes || ""}
+                  Entity Type
+                  <input
+                    value={editingUser.entityType || ""}
                     onChange={(e) =>
                       setEditing((prev) =>
                         prev && prev.type === "users"
                           ? {
                               type: "users",
                               original: prev.original,
-                              draft: { ...prev.draft, notes: e.target.value },
+                              draft: {
+                                ...prev.draft,
+                                entityType: e.target.value,
+                              },
                             }
                           : prev
                       )
                     }
                     className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
-                    rows={3}
                   />
                 </label>
               </div>
@@ -991,7 +1123,11 @@ function MediaEditor({
             className="flex items-center gap-2 rounded-xl border border-foreground/15 bg-background/40 p-2"
           >
             {label === "Images" ? (
-              <img src={url} alt="preview" className="h-16 w-16 rounded-lg object-cover" />
+              <img
+                src={url}
+                alt="preview"
+                className="h-16 w-16 rounded-lg object-cover"
+              />
             ) : null}
             <div className="flex-1 break-all text-sm">
               <a

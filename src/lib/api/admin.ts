@@ -1,19 +1,27 @@
 import { fetchHomeworks, type HomeworkRecord } from "./homeworks";
 
-export type AdminUserRole = "temporary" | "standard" | "admin" | "employer";
+export type Role = "temporary" | "standard" | "admin" | "employer";
 export type AdminUserStatus = "active" | "disabled" | "banned";
 
-export interface AdminUserRecord {
+export type UserItem = {
   id: string;
   username: string;
+  display_name?: string;
   email?: string;
-  role: AdminUserRole;
-  status: AdminUserStatus;
-  createdAt?: string;
-  lastLoginAt?: string;
-  notes?: string;
-  scope?: string;
-}
+  password_hash?: string; // bcrypt hashed
+  role: Role;
+  blocked?: boolean;
+  token_version?: number;
+  created_at: string;
+  last_login?: string;
+  failed_login_attempts?: number;
+  last_failed_login_at?: string | null;
+  refresh_token_hash?: string | null;
+  refresh_token_expires_at?: string | null;
+  entityType?: string;
+  PK?: string;
+  SK?: string;
+};
 
 export interface AdminHomeworkRecord {
   id: string;
@@ -39,10 +47,7 @@ export interface PaginatedResult<T> {
   pageSize: number;
 }
 
-async function send<T>(
-  input: RequestInfo,
-  init?: RequestInit
-): Promise<T> {
+async function send<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const res = await fetch(input, {
     cache: "no-store",
     ...init,
@@ -93,14 +98,14 @@ export async function fetchAdminHomeworks(
 export async function fetchAdminUsers(
   params: Record<string, string | number | undefined> = {},
   token?: string
-) : Promise<PaginatedResult<AdminUserRecord> | AdminUserRecord[]> {
+): Promise<PaginatedResult<UserItem> | UserItem[]> {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
     if (value !== undefined && value !== null && value !== "") {
       search.set(key, String(value));
     }
   });
-  return send<PaginatedResult<AdminUserRecord> | AdminUserRecord[]>(
+  return send<PaginatedResult<UserItem> | UserItem[]>(
     `/api/users${search.toString() ? `?${search}` : ""}`,
     token
       ? {
@@ -163,10 +168,10 @@ export async function deleteAdminHomeworks(ids: string[], token: string) {
 
 export async function updateAdminUser(
   id: string,
-  payload: Partial<AdminUserRecord>,
+  payload: Partial<UserItem>,
   token: string
 ) {
-  return send<AdminUserRecord>(`/api/users/${id}`, {
+  return send<UserItem>(`/api/users/${id}`, {
     method: "PUT",
     body: JSON.stringify(payload),
     headers: {
@@ -200,7 +205,7 @@ export async function createTemporaryAccount(
   input: CreateTemporaryAccountInput,
   token: string
 ) {
-  return send<AdminUserRecord>(`/api/users`, {
+  return send<UserItem>(`/api/users`, {
     method: "POST",
     body: JSON.stringify({ action: "createTemporary", ...input }),
     headers: {
