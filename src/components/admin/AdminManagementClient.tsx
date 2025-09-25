@@ -592,15 +592,43 @@ export function AdminManagementClient() {
                   <tr key={`${record.id}-details`} className="bg-background/5">
                     <td
                       colSpan={12}
-                      className="px-3 py-3 text-xs text-foreground/70"
+                      className="px-3 py-3 text-sm text-foreground/70"
                     >
-                      <pre className="whitespace-pre-wrap break-words text-[12px]">
-                        {JSON.stringify(
-                          (({ PK, SK, id, ...filtered }) => filtered)(record),
-                          null,
-                          2
-                        )}
-                      </pre>
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-6xl">
+                        <div className="space-y-2">
+                          <h4 className="font-semibold text-foreground text-sm">Account Info</h4>
+                          <div className="space-y-1 text-xs">
+                            <div><span className="font-medium">Username:</span> {record.username}</div>
+                            <div><span className="font-medium">Display Name:</span> {record.display_name || "—"}</div>
+                            <div><span className="font-medium">Email:</span> {record.email || "—"}</div>
+                            <div><span className="font-medium">Role:</span> <span className="capitalize">{record.role}</span></div>
+                            <div><span className="font-medium">Entity Type:</span> {record.entityType || "—"}</div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <h4 className="font-semibold text-foreground text-sm">Security</h4>
+                          <div className="space-y-1 text-xs">
+                            <div><span className="font-medium">Status:</span>
+                              <span className={`ml-1 px-2 py-1 rounded text-xs ${record.blocked ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}`}>
+                                {record.blocked ? 'Blocked' : 'Active'}
+                              </span>
+                            </div>
+                            <div><span className="font-medium">Failed Login Attempts:</span> {record.failed_login_attempts || "0"}</div>
+                            <div><span className="font-medium">Last Failed Login:</span> {record.last_failed_login_at || "—"}</div>
+                            <div><span className="font-medium">Token Version:</span> {record.token_version || "—"}</div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <h4 className="font-semibold text-foreground text-sm">Timestamps</h4>
+                          <div className="space-y-1 text-xs">
+                            <div><span className="font-medium">Created:</span> {record.created_at ? new Date(record.created_at).toLocaleString() : "—"}</div>
+                            <div><span className="font-medium">Last Login:</span> {record.last_login ? new Date(record.last_login).toLocaleString() : "—"}</div>
+                            <div><span className="font-medium">Refresh Token Expires:</span> {record.refresh_token_expires_at ? new Date(record.refresh_token_expires_at).toLocaleString() : "—"}</div>
+                          </div>
+                        </div>
+                      </div>
                     </td>
                   </tr>
                 );
