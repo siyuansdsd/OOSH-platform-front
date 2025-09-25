@@ -59,12 +59,15 @@ export function AdminManagementClient() {
 
   useEffect(() => {
     if (!accessToken) return;
-    // Load data once when we obtain an access token. We intentionally do NOT
-    // reload when switching `view` so the previous search/results are reused
-    // until the user explicitly clicks Refresh.
+    // Only auto-load when we don't already have data for the selected view.
+    // This preserves the resource-saving behavior (no reload on every tab
+    // switch) while ensuring the first time you switch to Users/Homeworks we
+    // fetch the data if it's empty.
+    if (view === "homeworks" && homeworks.length > 0) return;
+    if (view === "users" && users.length > 0) return;
     void loadData(view);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accessToken]);
+  }, [accessToken, view]);
 
   // track which user rows are expanded to show full record details
   const [expandedUserIds, setExpandedUserIds] = useState<string[]>([]);
