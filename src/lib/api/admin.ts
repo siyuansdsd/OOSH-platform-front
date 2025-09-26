@@ -184,6 +184,20 @@ export async function updateAdminUser(
   });
 }
 
+export async function blockAdminUser(
+  id: string,
+  blocked: boolean,
+  token: string
+) {
+  return send<UserItem>(`/api/users/${id}/block`, {
+    method: "POST",
+    body: JSON.stringify({ block: blocked }),
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
 export async function bulkUpdateAdminUsers(
   payload: {
     ids: string[];

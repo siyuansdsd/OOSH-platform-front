@@ -11,6 +11,7 @@ import {
   updateAdminHomework,
   deleteAdminHomeworks,
   updateAdminUser,
+  blockAdminUser,
   bulkUpdateAdminUsers,
   createTemporaryAccount,
   createEmployerAccounts,
@@ -182,13 +183,22 @@ export function AdminManagementClient() {
         await updateAdminHomework(editing.draft.id, editing.draft, accessToken);
         await loadData("homeworks");
       } else {
+        const original = editing.original as UserItem;
+        const draft = editing.draft as UserItem;
+
+        // Handle profile updates
         const payload = {
-          email: editing.draft.email,
-          role: editing.draft.role,
-          blocked: editing.draft.blocked,
-          display_name: editing.draft.display_name,
+          email: draft.email,
+          role: draft.role,
+          display_name: draft.display_name,
         };
-        await updateAdminUser(editing.draft.id, payload, accessToken);
+        await updateAdminUser(draft.id, payload, accessToken);
+
+        // Handle blocking status separately if changed
+        if (original.blocked !== draft.blocked) {
+          await blockAdminUser(draft.id, !!draft.blocked, accessToken);
+        }
+
         await loadData("users");
       }
       setEditing(null);
@@ -209,7 +219,17 @@ export function AdminManagementClient() {
         await deleteAdminHomeworks(selectedIds, accessToken);
         await loadData("homeworks");
       } else if (view === "users") {
-        await bulkUpdateAdminUsers({ ids: selectedIds, action }, accessToken);
+        if (action === "disable" || action === "enable") {
+          // Use individual block API calls for block/unblock operations
+          await Promise.all(
+            selectedIds.map(id =>
+              blockAdminUser(id, action === "disable", accessToken)
+            )
+          );
+        } else {
+          // Use bulk API for delete and ban operations
+          await bulkUpdateAdminUsers({ ids: selectedIds, action }, accessToken);
+        }
         await loadData("users");
       }
       setSelectedIds([]);
