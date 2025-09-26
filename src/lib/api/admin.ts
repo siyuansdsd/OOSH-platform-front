@@ -246,7 +246,7 @@ export async function createTemporaryAccount(
 }
 
 export interface CreateEmployerAccountsInput {
-  accounts: Array<{ email: string; password: string }>;
+  accounts: Array<{ username: string; display_name: string; email: string; password: string }>;
 }
 
 export async function createEmployerAccounts(

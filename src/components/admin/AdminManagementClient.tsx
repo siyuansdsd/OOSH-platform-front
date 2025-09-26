@@ -268,8 +268,13 @@ export function AdminManagementClient() {
 
   const handleCreateEmployers = async () => {
     const accounts = employerDrafts
-      .map((draft) => ({ email: draft.email.trim(), password: draft.password }))
-      .filter((draft) => draft.email && draft.password);
+      .map((draft) => ({
+        username: draft.email.trim(),  // Use email as username
+        display_name: draft.display_name.trim(),
+        email: draft.email.trim(),
+        password: draft.password
+      }))
+      .filter((draft) => draft.display_name && draft.email && draft.password);
     if (accounts.length === 0) return;
     setCreatingEmployers(true);
     try {
@@ -904,11 +909,11 @@ export function AdminManagementClient() {
         </div>
         <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6">
           <h2 className="text-lg font-semibold text-foreground">
-            Employer accounts
+            Employee accounts
           </h2>
           {employerUsers.length === 0 ? (
             <p className="mt-2 text-sm text-foreground/60">
-              No employer accounts found.
+              No employee accounts found.
             </p>
           ) : (
             <ul className="mt-4 space-y-2 text-sm text-foreground/80">
@@ -1149,110 +1154,248 @@ export function AdminManagementClient() {
 
             {editingUser ? (
               <div className="mt-4 space-y-3">
-                <label className="text-sm text-foreground/80">
-                  Username
-                  <input
-                    value={editingUser.username || ""}
-                    onChange={(e) =>
-                      setEditing((prev) =>
-                        prev && prev.type === "users"
-                          ? {
-                              type: "users",
-                              original: prev.original,
-                              draft: { ...prev.draft, username: e.target.value },
-                            }
-                          : prev
-                      )
-                    }
-                    className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
-                  />
-                </label>
-                <label className="text-sm text-foreground/80">
-                  Email
-                  <input
-                    value={editingUser.email || ""}
-                    onChange={(e) =>
-                      setEditing((prev) =>
-                        prev && prev.type === "users"
-                          ? {
-                              type: "users",
-                              original: prev.original,
-                              draft: { ...prev.draft, email: e.target.value },
-                            }
-                          : prev
-                      )
-                    }
-                    className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
-                  />
-                </label>
-                <label className="text-sm text-foreground/80">
-                  Role
-                  <select
-                    value={editingUser.role}
-                    onChange={(e) =>
-                      setEditing((prev) =>
-                        prev && prev.type === "users"
-                          ? {
-                              type: "users",
-                              original: prev.original,
-                              draft: {
-                                ...prev.draft,
-                                role: e.target.value as Role,
-                              },
-                            }
-                          : prev
-                      )
-                    }
-                    className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
-                  >
-                    <option value="temporary">Temporary</option>
-                    <option value="standard">Standard</option>
-                    <option value="admin">Admin</option>
-                    <option value="employer">Employer</option>
-                  </select>
-                </label>
-                <label className="text-sm text-foreground/80 flex items-center gap-3">
-                  <input
-                    type="checkbox"
-                    checked={!!editingUser.blocked}
-                    onChange={(e) =>
-                      setEditing((prev) =>
-                        prev && prev.type === "users"
-                          ? {
-                              type: "users",
-                              original: prev.original,
-                              draft: {
-                                ...prev.draft,
-                                blocked: e.target.checked,
-                              },
-                            }
-                          : prev
-                      )
-                    }
-                  />
-                  Block account
-                </label>
-                <label className="text-sm text-foreground/80">
-                  Display Name
-                  <input
-                    value={editingUser.display_name || ""}
-                    onChange={(e) =>
-                      setEditing((prev) =>
-                        prev && prev.type === "users"
-                          ? {
-                              type: "users",
-                              original: prev.original,
-                              draft: {
-                                ...prev.draft,
-                                display_name: e.target.value,
-                              },
-                            }
-                          : prev
-                      )
-                    }
-                    className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
-                  />
-                </label>
+                {editingUser.role === "temporary" ? (
+                  // Temporary user: username, password, role, state
+                  <>
+                    <label className="text-sm text-foreground/80">
+                      Username
+                      <input
+                        value={editingUser.username || ""}
+                        onChange={(e) =>
+                          setEditing((prev) =>
+                            prev && prev.type === "users"
+                              ? {
+                                  type: "users",
+                                  original: prev.original,
+                                  draft: { ...prev.draft, username: e.target.value },
+                                }
+                              : prev
+                          )
+                        }
+                        className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
+                      />
+                    </label>
+                    <label className="text-sm text-foreground/80">
+                      Role
+                      <select
+                        value={editingUser.role}
+                        onChange={(e) =>
+                          setEditing((prev) =>
+                            prev && prev.type === "users"
+                              ? {
+                                  type: "users",
+                                  original: prev.original,
+                                  draft: {
+                                    ...prev.draft,
+                                    role: e.target.value as Role,
+                                  },
+                                }
+                              : prev
+                          )
+                        }
+                        className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
+                      >
+                        <option value="temporary">Temporary</option>
+                        <option value="standard">Standard</option>
+                        <option value="admin">Admin</option>
+                        <option value="employer">Employer</option>
+                      </select>
+                    </label>
+                    <label className="text-sm text-foreground/80 flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        checked={!!editingUser.blocked}
+                        onChange={(e) =>
+                          setEditing((prev) =>
+                            prev && prev.type === "users"
+                              ? {
+                                  type: "users",
+                                  original: prev.original,
+                                  draft: {
+                                    ...prev.draft,
+                                    blocked: e.target.checked,
+                                  },
+                                }
+                              : prev
+                          )
+                        }
+                      />
+                      Blocked State
+                    </label>
+                  </>
+                ) : editingUser.role === "employer" ? (
+                  // Employer user: display_name, email, password
+                  <>
+                    <label className="text-sm text-foreground/80">
+                      Display Name
+                      <input
+                        value={editingUser.display_name || ""}
+                        onChange={(e) =>
+                          setEditing((prev) =>
+                            prev && prev.type === "users"
+                              ? {
+                                  type: "users",
+                                  original: prev.original,
+                                  draft: {
+                                    ...prev.draft,
+                                    display_name: e.target.value,
+                                  },
+                                }
+                              : prev
+                          )
+                        }
+                        className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
+                      />
+                    </label>
+                    <label className="text-sm text-foreground/80">
+                      Email
+                      <input
+                        value={editingUser.email || ""}
+                        onChange={(e) =>
+                          setEditing((prev) =>
+                            prev && prev.type === "users"
+                              ? {
+                                  type: "users",
+                                  original: prev.original,
+                                  draft: { ...prev.draft, email: e.target.value },
+                                }
+                              : prev
+                          )
+                        }
+                        className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
+                      />
+                    </label>
+                    <label className="text-sm text-foreground/80 flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        checked={!!editingUser.blocked}
+                        onChange={(e) =>
+                          setEditing((prev) =>
+                            prev && prev.type === "users"
+                              ? {
+                                  type: "users",
+                                  original: prev.original,
+                                  draft: {
+                                    ...prev.draft,
+                                    blocked: e.target.checked,
+                                  },
+                                }
+                              : prev
+                          )
+                        }
+                      />
+                      Block account
+                    </label>
+                  </>
+                ) : (
+                  // Standard user: all fields
+                  <>
+                    <label className="text-sm text-foreground/80">
+                      Username
+                      <input
+                        value={editingUser.username || ""}
+                        onChange={(e) =>
+                          setEditing((prev) =>
+                            prev && prev.type === "users"
+                              ? {
+                                  type: "users",
+                                  original: prev.original,
+                                  draft: { ...prev.draft, username: e.target.value },
+                                }
+                              : prev
+                          )
+                        }
+                        className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
+                      />
+                    </label>
+                    <label className="text-sm text-foreground/80">
+                      Email
+                      <input
+                        value={editingUser.email || ""}
+                        onChange={(e) =>
+                          setEditing((prev) =>
+                            prev && prev.type === "users"
+                              ? {
+                                  type: "users",
+                                  original: prev.original,
+                                  draft: { ...prev.draft, email: e.target.value },
+                                }
+                              : prev
+                          )
+                        }
+                        className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
+                      />
+                    </label>
+                    <label className="text-sm text-foreground/80">
+                      Role
+                      <select
+                        value={editingUser.role}
+                        onChange={(e) =>
+                          setEditing((prev) =>
+                            prev && prev.type === "users"
+                              ? {
+                                  type: "users",
+                                  original: prev.original,
+                                  draft: {
+                                    ...prev.draft,
+                                    role: e.target.value as Role,
+                                  },
+                                }
+                              : prev
+                          )
+                        }
+                        className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
+                      >
+                        <option value="temporary">Temporary</option>
+                        <option value="standard">Standard</option>
+                        <option value="admin">Admin</option>
+                        <option value="employer">Employer</option>
+                      </select>
+                    </label>
+                    <label className="text-sm text-foreground/80 flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        checked={!!editingUser.blocked}
+                        onChange={(e) =>
+                          setEditing((prev) =>
+                            prev && prev.type === "users"
+                              ? {
+                                  type: "users",
+                                  original: prev.original,
+                                  draft: {
+                                    ...prev.draft,
+                                    blocked: e.target.checked,
+                                  },
+                                }
+                              : prev
+                          )
+                        }
+                      />
+                      Block account
+                    </label>
+                    <label className="text-sm text-foreground/80">
+                      Display Name
+                      <input
+                        value={editingUser.display_name || ""}
+                        onChange={(e) =>
+                          setEditing((prev) =>
+                            prev && prev.type === "users"
+                              ? {
+                                  type: "users",
+                                  original: prev.original,
+                                  draft: {
+                                    ...prev.draft,
+                                    display_name: e.target.value,
+                                  },
+                                }
+                              : prev
+                          )
+                        }
+                        className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
+                      />
+                    </label>
+                  </>
+                )}
               </div>
             ) : null}
 
