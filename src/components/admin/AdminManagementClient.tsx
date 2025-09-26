@@ -59,7 +59,9 @@ export function AdminManagementClient() {
     { display_name: "", email: "", password: "" },
   ]);
   const [creatingEmployers, setCreatingEmployers] = useState(false);
-  const [bulkActionLoading, setBulkActionLoading] = useState<string | null>(null);
+  const [bulkActionLoading, setBulkActionLoading] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     if (!accessToken) return;
@@ -75,6 +77,7 @@ export function AdminManagementClient() {
 
   // track which user rows are expanded to show full record details
   const [expandedUserIds, setExpandedUserIds] = useState<string[]>([]);
+  const [editingPassword, setEditingPassword] = useState<string>("");
 
   const toggleUserExpanded = (id: string) => {
     setExpandedUserIds((prev) =>
@@ -107,12 +110,13 @@ export function AdminManagementClient() {
     }
   }
 
-  const activeRecords = view === "homeworks"
-    ? homeworks
-    : users.filter(user => {
-        const role = (user.role || "").toLowerCase();
-        return role === "standard" || role === "user";
-      });
+  const activeRecords =
+    view === "homeworks"
+      ? homeworks
+      : users.filter((user) => {
+          const role = (user.role || "").toLowerCase();
+          return role === "standard" || role === "user";
+        });
 
   const filteredRecords = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -180,6 +184,7 @@ export function AdminManagementClient() {
       original: record,
       draft: { ...record },
     });
+    setEditingPassword("");
   };
 
   const handleUpdate = async () => {
@@ -193,14 +198,21 @@ export function AdminManagementClient() {
       } else {
         const draft = editing.draft as UserItem;
 
-        // Send all user updates in a single PUT request
-        const payload = {
-          username: draft.username,
-          email: draft.email,
-          role: draft.role,
-          display_name: draft.display_name,
-          blocked: draft.blocked,
-        };
+        // Build payload according to role and provided password
+        const payload: Record<string, any> = {};
+        if (draft.role === "temporary") {
+          // temporary: only username and password editable
+          payload.username = draft.username;
+          if (editingPassword) payload.password = editingPassword;
+        } else {
+          // employee/employer/standard: allow common fields
+          payload.username = draft.username;
+          payload.display_name = draft.display_name;
+          payload.email = draft.email;
+          payload.blocked = draft.blocked;
+          if (editingPassword) payload.password = editingPassword;
+        }
+
         await updateAdminUser(draft.id, payload, accessToken);
         await loadData("users");
       }
@@ -226,16 +238,14 @@ export function AdminManagementClient() {
         if (action === "disable" || action === "enable") {
           // Use individual block API calls for block/unblock operations
           await Promise.all(
-            selectedIds.map(id =>
+            selectedIds.map((id) =>
               blockAdminUser(id, action === "disable", accessToken)
             )
           );
         } else if (action === "ban") {
           // Use individual DELETE API calls for permanent deletion
           await Promise.all(
-            selectedIds.map(id =>
-              deleteAdminUser(id, accessToken)
-            )
+            selectedIds.map((id) => deleteAdminUser(id, accessToken))
           );
         } else {
           // Use bulk API for other operations (if any remain)
@@ -269,10 +279,10 @@ export function AdminManagementClient() {
   const handleCreateEmployers = async () => {
     const accounts = employerDrafts
       .map((draft) => ({
-        username: draft.email.trim(),  // Use email as username
+        username: draft.email.trim(), // Use email as username
         display_name: draft.display_name.trim(),
         email: draft.email.trim(),
-        password: draft.password
+        password: draft.password,
       }))
       .filter((draft) => draft.display_name && draft.email && draft.password);
     if (accounts.length === 0) return;
@@ -300,8 +310,7 @@ export function AdminManagementClient() {
   );
 
   const employerUsers = useMemo(
-    () =>
-      users.filter((user) => user.role === "employer"),
+    () => users.filter((user) => user.role === "employer"),
     [users]
   );
 
@@ -520,49 +529,65 @@ export function AdminManagementClient() {
           {view === "homeworks" ? (
             <button
               type="button"
-              disabled={displayedSelected.length === 0 || bulkActionLoading !== null}
+              disabled={
+                displayedSelected.length === 0 || bulkActionLoading !== null
+              }
               onClick={() => void handleBulkAction("delete")}
               className="rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60 flex items-center gap-2"
             >
               {bulkActionLoading === "delete" && (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               )}
-              {bulkActionLoading === "delete" ? "Deleting..." : "Delete selected"}
+              {bulkActionLoading === "delete"
+                ? "Deleting..."
+                : "Delete selected"}
             </button>
           ) : (
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                disabled={displayedSelected.length === 0 || bulkActionLoading !== null}
+                disabled={
+                  displayedSelected.length === 0 || bulkActionLoading !== null
+                }
                 onClick={() => void handleBulkAction("disable")}
                 className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60 flex items-center gap-2"
               >
                 {bulkActionLoading === "disable" && (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 )}
-                {bulkActionLoading === "disable" ? "Blocking..." : "Block selected accounts"}
+                {bulkActionLoading === "disable"
+                  ? "Blocking..."
+                  : "Block selected accounts"}
               </button>
               <button
                 type="button"
-                disabled={displayedSelected.length === 0 || bulkActionLoading !== null}
+                disabled={
+                  displayedSelected.length === 0 || bulkActionLoading !== null
+                }
                 onClick={() => void handleBulkAction("ban")}
                 className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60 flex items-center gap-2"
               >
                 {bulkActionLoading === "ban" && (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 )}
-                {bulkActionLoading === "ban" ? "Deleting..." : "Forever delete selected"}
+                {bulkActionLoading === "ban"
+                  ? "Deleting..."
+                  : "Forever delete selected"}
               </button>
               <button
                 type="button"
-                disabled={displayedSelected.length === 0 || bulkActionLoading !== null}
+                disabled={
+                  displayedSelected.length === 0 || bulkActionLoading !== null
+                }
                 onClick={() => void handleBulkAction("enable")}
                 className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60 flex items-center gap-2"
               >
                 {bulkActionLoading === "enable" && (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 )}
-                {bulkActionLoading === "enable" ? "Activating..." : "Unblock selected accounts"}
+                {bulkActionLoading === "enable"
+                  ? "Activating..."
+                  : "Unblock selected accounts"}
               </button>
             </div>
           )}
@@ -809,7 +834,10 @@ export function AdminManagementClient() {
                     value={draft.display_name}
                     onChange={(e) => {
                       const next = [...employerDrafts];
-                      next[index] = { ...next[index], display_name: e.target.value };
+                      next[index] = {
+                        ...next[index],
+                        display_name: e.target.value,
+                      };
                       setEmployerDrafts(next);
                     }}
                     className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
@@ -890,54 +918,105 @@ export function AdminManagementClient() {
           <h2 className="text-lg font-semibold text-foreground">
             Temporary accounts
           </h2>
+          <p className="mt-1 text-sm text-foreground/60">
+            List of temporary users (role = temporary).
+          </p>
           {temporaryUsers.length === 0 ? (
             <p className="mt-2 text-sm text-foreground/60">
               No temporary accounts created yet.
             </p>
           ) : (
-            <ul className="mt-4 space-y-2 text-sm text-foreground/80">
-              {temporaryUsers.map((user) => (
-                <li key={user.id} className="truncate">
-                  <span className="font-medium">{user.username}</span>
-                  {user.email ? (
-                    <span className="text-foreground/60"> · {user.email}</span>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
+            <div className="mt-4 overflow-x-auto">
+              <table className="min-w-full text-left text-sm">
+                <thead className="text-xs font-semibold text-foreground/80">
+                  <tr>
+                    <th className="px-3 py-2">Username</th>
+                    <th className="px-3 py-2">Password</th>
+                    <th className="px-3 py-2">Role</th>
+                    <th className="px-3 py-2">State</th>
+                    <th className="px-3 py-2">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {temporaryUsers.map((user) => (
+                    <tr key={user.id} className="border-t border-foreground/10">
+                      <td className="px-3 py-2">{user.username}</td>
+                      <td className="px-3 py-2">—</td>
+                      <td className="px-3 py-2">{user.role}</td>
+                      <td className="px-3 py-2">
+                        {user.blocked ? "Blocked" : "Active"}
+                      </td>
+                      <td className="px-3 py-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            openUserEditor(user);
+                            setEditingPassword("");
+                          }}
+                          className="rounded-lg border border-foreground/20 px-2 py-1 text-xs"
+                        >
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
+
         <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6">
           <h2 className="text-lg font-semibold text-foreground">
             Employee accounts
           </h2>
+          <p className="mt-1 text-sm text-foreground/60">
+            List of employee/employer users.
+          </p>
           {employerUsers.length === 0 ? (
             <p className="mt-2 text-sm text-foreground/60">
               No employee accounts found.
             </p>
           ) : (
-            <ul className="mt-4 space-y-2 text-sm text-foreground/80">
-              {employerUsers.map((user) => (
-                <li key={user.id} className="truncate flex items-center justify-between">
-                  <div>
-                    <span className="font-medium">{user.display_name || user.username}</span>
-                    {user.email ? (
-                      <span className="text-foreground/60"> · {user.email}</span>
-                    ) : null}
-                    <span className="text-foreground/50"> · {user.role}</span>
-                  </div>
-                  <div className="flex gap-1">
-                    <button
-                      type="button"
-                      onClick={() => openUserEditor(user)}
-                      className="rounded-lg border border-foreground/20 px-2 py-1 text-xs"
-                    >
-                      Edit
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <div className="mt-4 overflow-x-auto">
+              <table className="min-w-full text-left text-sm">
+                <thead className="text-xs font-semibold text-foreground/80">
+                  <tr>
+                    <th className="px-3 py-2">Username</th>
+                    <th className="px-3 py-2">Display name</th>
+                    <th className="px-3 py-2">Email</th>
+                    <th className="px-3 py-2">Password</th>
+                    <th className="px-3 py-2">Status</th>
+                    <th className="px-3 py-2">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {employerUsers.map((user) => (
+                    <tr key={user.id} className="border-t border-foreground/10">
+                      <td className="px-3 py-2">{user.username}</td>
+                      <td className="px-3 py-2">{user.display_name || "—"}</td>
+                      <td className="px-3 py-2">{user.email || "—"}</td>
+                      <td className="px-3 py-2">—</td>
+                      <td className="px-3 py-2">
+                        {user.blocked ? "Blocked" : "Active"}
+                      </td>
+                      <td className="px-3 py-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            openUserEditor(user);
+                            setEditingPassword("");
+                          }}
+                          className="rounded-lg border border-foreground/20 px-2 py-1 text-xs"
+                        >
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </div>
       </section>
@@ -1167,7 +1246,10 @@ export function AdminManagementClient() {
                               ? {
                                   type: "users",
                                   original: prev.original,
-                                  draft: { ...prev.draft, username: e.target.value },
+                                  draft: {
+                                    ...prev.draft,
+                                    username: e.target.value,
+                                  },
                                 }
                               : prev
                           )
@@ -1222,6 +1304,15 @@ export function AdminManagementClient() {
                       />
                       Blocked State
                     </label>
+                    <label className="text-sm text-foreground/80">
+                      Password (leave blank to keep existing)
+                      <input
+                        value={editingPassword}
+                        onChange={(e) => setEditingPassword(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
+                        type="password"
+                      />
+                    </label>
                   </>
                 ) : editingUser.role === "employer" ? (
                   // Employer user: display_name, email, password
@@ -1257,7 +1348,10 @@ export function AdminManagementClient() {
                               ? {
                                   type: "users",
                                   original: prev.original,
-                                  draft: { ...prev.draft, email: e.target.value },
+                                  draft: {
+                                    ...prev.draft,
+                                    email: e.target.value,
+                                  },
                                 }
                               : prev
                           )
@@ -1286,6 +1380,15 @@ export function AdminManagementClient() {
                       />
                       Block account
                     </label>
+                    <label className="text-sm text-foreground/80">
+                      Password (leave blank to keep existing)
+                      <input
+                        value={editingPassword}
+                        onChange={(e) => setEditingPassword(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
+                        type="password"
+                      />
+                    </label>
                   </>
                 ) : (
                   // Standard user: all fields
@@ -1300,7 +1403,10 @@ export function AdminManagementClient() {
                               ? {
                                   type: "users",
                                   original: prev.original,
-                                  draft: { ...prev.draft, username: e.target.value },
+                                  draft: {
+                                    ...prev.draft,
+                                    username: e.target.value,
+                                  },
                                 }
                               : prev
                           )
@@ -1318,7 +1424,10 @@ export function AdminManagementClient() {
                               ? {
                                   type: "users",
                                   original: prev.original,
-                                  draft: { ...prev.draft, email: e.target.value },
+                                  draft: {
+                                    ...prev.draft,
+                                    email: e.target.value,
+                                  },
                                 }
                               : prev
                           )
@@ -1392,6 +1501,15 @@ export function AdminManagementClient() {
                           )
                         }
                         className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
+                      />
+                    </label>
+                    <label className="text-sm text-foreground/80">
+                      Password (leave blank to keep existing)
+                      <input
+                        value={editingPassword}
+                        onChange={(e) => setEditingPassword(e.target.value)}
+                        className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
+                        type="password"
                       />
                     </label>
                   </>
