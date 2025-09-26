@@ -171,7 +171,7 @@ export async function updateAdminUser(
   payload: Partial<UserItem>,
   token: string
 ) {
-  return send<UserItem>(`/api/users/${id}`, {
+  return send<UserItem>(`/api/admin/users/${id}`, {
     method: "PUT",
     body: JSON.stringify(payload),
     headers: {
@@ -198,7 +198,7 @@ export async function deleteAdminUser(
   id: string,
   token: string
 ) {
-  return send<{ ok: boolean }>(`/api/users/${id}`, {
+  return send<{ ok: boolean }>(`/api/admin/users/${id}`, {
     method: "DELETE",
     headers: {
       Authorization: `Bearer ${token}`,
