@@ -194,6 +194,18 @@ export async function blockAdminUser(
   });
 }
 
+export async function deleteAdminUser(
+  id: string,
+  token: string
+) {
+  return send<{ ok: boolean }>(`/api/users/${id}`, {
+    method: "DELETE",
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
 export async function bulkUpdateAdminUsers(
   payload: {
     ids: string[];

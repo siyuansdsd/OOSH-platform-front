@@ -12,6 +12,7 @@ import {
   deleteAdminHomeworks,
   updateAdminUser,
   blockAdminUser,
+  deleteAdminUser,
   bulkUpdateAdminUsers,
   createTemporaryAccount,
   createEmployerAccounts,
@@ -222,8 +223,15 @@ export function AdminManagementClient() {
               blockAdminUser(id, action === "disable", accessToken)
             )
           );
+        } else if (action === "ban") {
+          // Use individual DELETE API calls for permanent deletion
+          await Promise.all(
+            selectedIds.map(id =>
+              deleteAdminUser(id, accessToken)
+            )
+          );
         } else {
-          // Use bulk API for delete and ban operations
+          // Use bulk API for other operations (if any remain)
           await bulkUpdateAdminUsers({ ids: selectedIds, action }, accessToken);
         }
         await loadData("users");
