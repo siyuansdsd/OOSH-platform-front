@@ -78,6 +78,7 @@ export function AdminManagementClient() {
   // track which user rows are expanded to show full record details
   const [expandedUserIds, setExpandedUserIds] = useState<string[]>([]);
   const [editingPassword, setEditingPassword] = useState<string>("");
+  const [blockingIds, setBlockingIds] = useState<string[]>([]);
 
   const toggleUserExpanded = (id: string) => {
     setExpandedUserIds((prev) =>
@@ -444,8 +445,9 @@ export function AdminManagementClient() {
           "—"
         )}
       </td>
-      <td className="px-3 py-3 text-sm capitalize text-foreground">
-        {record.role}
+      <td className="px-3 py-3 text-sm text-foreground">
+        {String(record.role).charAt(0).toUpperCase() +
+          String(record.role).slice(1)}
       </td>
       <td className="px-3 py-3 text-sm capitalize text-foreground/70">
         {record.blocked ? "Blocked" : "Active"}
@@ -918,9 +920,7 @@ export function AdminManagementClient() {
           <h2 className="text-lg font-semibold text-foreground">
             Temporary accounts
           </h2>
-          <p className="mt-1 text-sm text-foreground/60">
-            List of temporary users (role = temporary).
-          </p>
+          {/* description removed per UX request */}
           {temporaryUsers.length === 0 ? (
             <p className="mt-2 text-sm text-foreground/60">
               No temporary accounts created yet.
@@ -942,11 +942,14 @@ export function AdminManagementClient() {
                     <tr key={user.id} className="border-t border-foreground/10">
                       <td className="px-3 py-2">{user.username}</td>
                       <td className="px-3 py-2">—</td>
-                      <td className="px-3 py-2">{user.role}</td>
+                      <td className="px-3 py-2">
+                        {String(user.role).charAt(0).toUpperCase() +
+                          String(user.role).slice(1)}
+                      </td>
                       <td className="px-3 py-2">
                         {user.blocked ? "Blocked" : "Active"}
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-2 flex items-center gap-2">
                         <button
                           type="button"
                           onClick={() => {
@@ -956,6 +959,37 @@ export function AdminManagementClient() {
                           className="rounded-lg border border-foreground/20 px-2 py-1 text-xs"
                         >
                           Edit
+                        </button>
+                        <button
+                          type="button"
+                          disabled={blockingIds.includes(user.id)}
+                          onClick={async () => {
+                            try {
+                              if (!accessToken)
+                                throw new Error("Not authenticated");
+                              setBlockingIds((prev) => [...prev, user.id]);
+                              // toggle block state
+                              await blockAdminUser(
+                                user.id,
+                                !user.blocked,
+                                accessToken
+                              );
+                              await loadData("users");
+                            } catch (err: any) {
+                              setError(err?.message || "Block/Unblock failed");
+                            } finally {
+                              setBlockingIds((prev) =>
+                                prev.filter((id) => id !== user.id)
+                              );
+                            }
+                          }}
+                          className="rounded-lg border border-foreground/20 px-2 py-1 text-xs"
+                        >
+                          {blockingIds.includes(user.id)
+                            ? "Processing..."
+                            : user.blocked
+                            ? "Unblock"
+                            : "Block"}
                         </button>
                       </td>
                     </tr>
@@ -970,9 +1004,7 @@ export function AdminManagementClient() {
           <h2 className="text-lg font-semibold text-foreground">
             Employee accounts
           </h2>
-          <p className="mt-1 text-sm text-foreground/60">
-            List of employee/employer users.
-          </p>
+          {/* description removed per UX request */}
           {employerUsers.length === 0 ? (
             <p className="mt-2 text-sm text-foreground/60">
               No employee accounts found.
@@ -1000,7 +1032,7 @@ export function AdminManagementClient() {
                       <td className="px-3 py-2">
                         {user.blocked ? "Blocked" : "Active"}
                       </td>
-                      <td className="px-3 py-2">
+                      <td className="px-3 py-2 flex items-center gap-2">
                         <button
                           type="button"
                           onClick={() => {
@@ -1010,6 +1042,36 @@ export function AdminManagementClient() {
                           className="rounded-lg border border-foreground/20 px-2 py-1 text-xs"
                         >
                           Edit
+                        </button>
+                        <button
+                          type="button"
+                          disabled={blockingIds.includes(user.id)}
+                          onClick={async () => {
+                            try {
+                              if (!accessToken)
+                                throw new Error("Not authenticated");
+                              setBlockingIds((prev) => [...prev, user.id]);
+                              await blockAdminUser(
+                                user.id,
+                                !user.blocked,
+                                accessToken
+                              );
+                              await loadData("users");
+                            } catch (err: any) {
+                              setError(err?.message || "Block/Unblock failed");
+                            } finally {
+                              setBlockingIds((prev) =>
+                                prev.filter((id) => id !== user.id)
+                              );
+                            }
+                          }}
+                          className="rounded-lg border border-foreground/20 px-2 py-1 text-xs"
+                        >
+                          {blockingIds.includes(user.id)
+                            ? "Processing..."
+                            : user.blocked
+                            ? "Unblock"
+                            : "Block"}
                         </button>
                       </td>
                     </tr>
