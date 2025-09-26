@@ -19,7 +19,8 @@ import {
 } from "@/lib/api/admin";
 import { useAuth } from "@/components/auth/AuthProvider";
 
-interface EmployerDraft {
+interface EmployeeDraft {
+  display_name: string;
   email: string;
   password: string;
 }
@@ -54,8 +55,8 @@ export function AdminManagementClient() {
   });
   const [creatingTemp, setCreatingTemp] = useState(false);
 
-  const [employerDrafts, setEmployerDrafts] = useState<EmployerDraft[]>([
-    { email: "", password: "" },
+  const [employerDrafts, setEmployerDrafts] = useState<EmployeeDraft[]>([
+    { display_name: "", email: "", password: "" },
   ]);
   const [creatingEmployers, setCreatingEmployers] = useState(false);
   const [bulkActionLoading, setBulkActionLoading] = useState<string | null>(null);
@@ -106,7 +107,9 @@ export function AdminManagementClient() {
     }
   }
 
-  const activeRecords = view === "homeworks" ? homeworks : users;
+  const activeRecords = view === "homeworks"
+    ? homeworks
+    : users.filter(user => user.role === "standard");
 
   const filteredRecords = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -189,6 +192,7 @@ export function AdminManagementClient() {
 
         // Send all user updates in a single PUT request
         const payload = {
+          username: draft.username,
           email: draft.email,
           role: draft.role,
           display_name: draft.display_name,
@@ -269,7 +273,7 @@ export function AdminManagementClient() {
       if (!accessToken) throw new Error("Not authenticated");
       await createEmployerAccounts({ accounts }, accessToken);
       await loadData("users");
-      setEmployerDrafts([{ email: "", password: "" }]);
+      setEmployerDrafts([{ display_name: "", email: "", password: "" }]);
     } catch (err: any) {
       setError(err?.message || "Batch create failed");
     } finally {
@@ -287,13 +291,9 @@ export function AdminManagementClient() {
     [users]
   );
 
-  const editorUsers = useMemo(
+  const employerUsers = useMemo(
     () =>
-      users.filter((user) => {
-        const role = (user.role || "").toLowerCase();
-        const type = (user.entityType || "").toLowerCase();
-        return role === "editor" || type === "admin" || role === "admin";
-      }),
+      users.filter((user) => user.role === "employer"),
     [users]
   );
 
@@ -787,14 +787,26 @@ export function AdminManagementClient() {
 
         <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6">
           <h2 className="text-lg font-semibold text-foreground">
-            Employer invitations
+            Employee invitations
           </h2>
           <p className="mt-1 text-sm text-foreground/60">
-            Add employer accounts in bulk by email and password.
+            Add employee accounts in bulk by display name, email and password.
           </p>
           <div className="mt-4 space-y-3">
             {employerDrafts.map((draft, index) => (
-              <div key={index} className="grid gap-3 sm:grid-cols-2">
+              <div key={index} className="grid gap-3 sm:grid-cols-3">
+                <label className="text-sm text-foreground/80">
+                  Display Name
+                  <input
+                    value={draft.display_name}
+                    onChange={(e) => {
+                      const next = [...employerDrafts];
+                      next[index] = { ...next[index], display_name: e.target.value };
+                      setEmployerDrafts(next);
+                    }}
+                    className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
+                  />
+                </label>
                 <label className="text-sm text-foreground/80">
                   Email
                   <input
@@ -832,7 +844,7 @@ export function AdminManagementClient() {
                 onClick={() =>
                   setEmployerDrafts((prev) => [
                     ...prev,
-                    { email: "", password: "" },
+                    { display_name: "", email: "", password: "" },
                   ])
                 }
                 className="rounded-lg border border-foreground/20 px-3 py-1 text-xs font-medium"
@@ -859,7 +871,7 @@ export function AdminManagementClient() {
               disabled={creatingEmployers}
               className="inline-flex w-fit items-center justify-center rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {creatingEmployers ? "Processing…" : "Create employer accounts"}
+              {creatingEmployers ? "Processing…" : "Create employee accounts"}
             </button>
           </div>
         </div>
@@ -889,21 +901,32 @@ export function AdminManagementClient() {
         </div>
         <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6">
           <h2 className="text-lg font-semibold text-foreground">
-            Editor / Admin accounts
+            Employer accounts
           </h2>
-          {editorUsers.length === 0 ? (
+          {employerUsers.length === 0 ? (
             <p className="mt-2 text-sm text-foreground/60">
-              No editor accounts found.
+              No employer accounts found.
             </p>
           ) : (
             <ul className="mt-4 space-y-2 text-sm text-foreground/80">
-              {editorUsers.map((user) => (
-                <li key={user.id} className="truncate">
-                  <span className="font-medium">{user.username}</span>
-                  {user.email ? (
-                    <span className="text-foreground/60"> · {user.email}</span>
-                  ) : null}
-                  <span className="text-foreground/50"> · {user.role}</span>
+              {employerUsers.map((user) => (
+                <li key={user.id} className="truncate flex items-center justify-between">
+                  <div>
+                    <span className="font-medium">{user.display_name || user.username}</span>
+                    {user.email ? (
+                      <span className="text-foreground/60"> · {user.email}</span>
+                    ) : null}
+                    <span className="text-foreground/50"> · {user.role}</span>
+                  </div>
+                  <div className="flex gap-1">
+                    <button
+                      type="button"
+                      onClick={() => openUserEditor(user)}
+                      className="rounded-lg border border-foreground/20 px-2 py-1 text-xs"
+                    >
+                      Edit
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -1123,6 +1146,24 @@ export function AdminManagementClient() {
 
             {editingUser ? (
               <div className="mt-4 space-y-3">
+                <label className="text-sm text-foreground/80">
+                  Username
+                  <input
+                    value={editingUser.username || ""}
+                    onChange={(e) =>
+                      setEditing((prev) =>
+                        prev && prev.type === "users"
+                          ? {
+                              type: "users",
+                              original: prev.original,
+                              draft: { ...prev.draft, username: e.target.value },
+                            }
+                          : prev
+                      )
+                    }
+                    className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
+                  />
+                </label>
                 <label className="text-sm text-foreground/80">
                   Email
                   <input
