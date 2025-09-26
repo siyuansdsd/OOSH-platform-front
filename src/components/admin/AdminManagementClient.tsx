@@ -109,7 +109,10 @@ export function AdminManagementClient() {
 
   const activeRecords = view === "homeworks"
     ? homeworks
-    : users.filter(user => user.role === "standard");
+    : users.filter(user => {
+        const role = (user.role || "").toLowerCase();
+        return role === "standard" || role === "user";
+      });
 
   const filteredRecords = useMemo(() => {
     const term = search.trim().toLowerCase();
