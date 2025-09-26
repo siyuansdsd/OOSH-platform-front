@@ -189,7 +189,7 @@ export async function blockAdminUser(
   blocked: boolean,
   token: string
 ) {
-  return send<UserItem>(`/api/users/${id}/block`, {
+  return send<UserItem>(`/api/admin/users/${id}/block`, {
     method: "POST",
     body: JSON.stringify({ block: blocked }),
     headers: {
