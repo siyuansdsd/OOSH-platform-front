@@ -184,22 +184,16 @@ export function AdminManagementClient() {
         await updateAdminHomework(editing.draft.id, editing.draft, accessToken);
         await loadData("homeworks");
       } else {
-        const original = editing.original as UserItem;
         const draft = editing.draft as UserItem;
 
-        // Handle profile updates
+        // Send all user updates in a single PUT request
         const payload = {
           email: draft.email,
           role: draft.role,
           display_name: draft.display_name,
+          blocked: draft.blocked,
         };
         await updateAdminUser(draft.id, payload, accessToken);
-
-        // Handle blocking status separately if changed
-        if (original.blocked !== draft.blocked) {
-          await blockAdminUser(draft.id, !!draft.blocked, accessToken);
-        }
-
         await loadData("users");
       }
       setEditing(null);
