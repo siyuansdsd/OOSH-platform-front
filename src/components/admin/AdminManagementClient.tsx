@@ -57,6 +57,7 @@ export function AdminManagementClient() {
     { email: "", password: "" },
   ]);
   const [creatingEmployers, setCreatingEmployers] = useState(false);
+  const [bulkActionLoading, setBulkActionLoading] = useState<string | null>(null);
 
   useEffect(() => {
     if (!accessToken) return;
@@ -213,6 +214,7 @@ export function AdminManagementClient() {
     action: "delete" | "disable" | "ban" | "enable"
   ) => {
     if (selectedIds.length === 0) return;
+    setBulkActionLoading(action);
     try {
       if (!accessToken) throw new Error("Not authenticated");
       if (view === "homeworks" && action === "delete") {
@@ -235,6 +237,8 @@ export function AdminManagementClient() {
       setSelectedIds([]);
     } catch (err: any) {
       setError(err?.message || "Action failed");
+    } finally {
+      setBulkActionLoading(null);
     }
   };
 
@@ -506,37 +510,49 @@ export function AdminManagementClient() {
           {view === "homeworks" ? (
             <button
               type="button"
-              disabled={displayedSelected.length === 0}
+              disabled={displayedSelected.length === 0 || bulkActionLoading !== null}
               onClick={() => void handleBulkAction("delete")}
-              className="rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-lg bg-red-500 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60 flex items-center gap-2"
             >
-              Delete selected
+              {bulkActionLoading === "delete" && (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              )}
+              {bulkActionLoading === "delete" ? "Deleting..." : "Delete selected"}
             </button>
           ) : (
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                disabled={displayedSelected.length === 0}
+                disabled={displayedSelected.length === 0 || bulkActionLoading !== null}
                 onClick={() => void handleBulkAction("disable")}
-                className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60 flex items-center gap-2"
               >
-                Block selected accounts
+                {bulkActionLoading === "disable" && (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                )}
+                {bulkActionLoading === "disable" ? "Blocking..." : "Block selected accounts"}
               </button>
               <button
                 type="button"
-                disabled={displayedSelected.length === 0}
+                disabled={displayedSelected.length === 0 || bulkActionLoading !== null}
                 onClick={() => void handleBulkAction("ban")}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60 flex items-center gap-2"
               >
-                Forever delete selected
+                {bulkActionLoading === "ban" && (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                )}
+                {bulkActionLoading === "ban" ? "Deleting..." : "Forever delete selected"}
               </button>
               <button
                 type="button"
-                disabled={displayedSelected.length === 0}
+                disabled={displayedSelected.length === 0 || bulkActionLoading !== null}
                 onClick={() => void handleBulkAction("enable")}
-                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-60 flex items-center gap-2"
               >
-                Unblock selected accounts
+                {bulkActionLoading === "enable" && (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                )}
+                {bulkActionLoading === "enable" ? "Activating..." : "Unblock selected accounts"}
               </button>
             </div>
           )}
