@@ -35,6 +35,8 @@ export function HomePageClient() {
   const [items, setItems] = useState<HomeworkRecord[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
+  const [serverTotal, setServerTotal] = useState<number | null>(null);
+  const [serverHasMore, setServerHasMore] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -90,6 +92,8 @@ export function HomePageClient() {
         });
         setPage(result.page);
         setHasMore(result.hasMore);
+        setServerTotal(result.total ?? null);
+        setServerHasMore(result.hasMore ?? null);
       } catch (error: unknown) {
         if (controller.signal.aborted) return;
         setError(
@@ -224,6 +228,8 @@ export function HomePageClient() {
         loading={loading}
         loadingMore={loadingMore}
         hasMore={hasMore}
+        rawTotal={serverTotal}
+        rawHasMore={serverHasMore}
         onLoadMore={loadMore}
       />
     </div>

@@ -10,6 +10,8 @@ interface GalleryProps {
   loadingMore?: boolean;
   onLoadMore?: () => void;
   hasMore?: boolean;
+  rawTotal?: number | null;
+  rawHasMore?: boolean | null;
   className?: string;
   emptyState?: React.ReactNode;
 }
@@ -129,6 +131,8 @@ export function Gallery({
   loadingMore,
   onLoadMore,
   hasMore,
+  rawTotal = null,
+  rawHasMore = null,
   className = "",
   emptyState,
 }: GalleryProps) {
@@ -494,7 +498,9 @@ export function Gallery({
         ) : null}
       </div>
 
-      {hasMore ? (
+      {(rawHasMore !== null && rawHasMore) ||
+      (rawTotal !== null && rawTotal > gridItems.length) ||
+      hasMore ? (
         <button
           type="button"
           onClick={onLoadMore}
