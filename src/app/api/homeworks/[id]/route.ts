@@ -6,14 +6,14 @@ const errorMessage = (error: unknown) =>
 
 export async function PUT(
   req: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const base = process.env.NEXT_PUBLIC_API_BASE ?? process.env.API_BASE;
     if (!base) {
       return NextResponse.json(
         { message: "Server not configured (API_BASE)" },
-        { status: 500 },
+        { status: 500 }
       );
     }
     const { id } = await params;
@@ -37,7 +37,47 @@ export async function PUT(
   } catch (error: unknown) {
     return NextResponse.json(
       { message: errorMessage(error) || "Proxy failed" },
-      { status: 500 },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const base = process.env.NEXT_PUBLIC_API_BASE ?? process.env.API_BASE;
+    if (!base) {
+      return NextResponse.json(
+        { message: "Server not configured (API_BASE)" },
+        { status: 500 }
+      );
+    }
+    const { id } = await params;
+    const authHeader = req.headers.get("authorization") || undefined;
+    const res = await fetch(`${base}/api/homeworks/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      headers: {
+        ...(authHeader ? { Authorization: authHeader } : {}),
+      },
+    });
+    const text = await res.text();
+    return new NextResponse(text, {
+      status: res.status,
+      headers: {
+        "content-type": res.headers.get("content-type") ?? "application/json",
+      },
+    });
+  } catch (error: unknown) {
+    return NextResponse.json(
+      {
+        message:
+          error instanceof Error
+            ? error.message
+            : String(error ?? "") || "Proxy failed",
+      },
+      { status: 500 }
     );
   }
 }
