@@ -23,6 +23,7 @@ export function NavBar() {
   const normalizedScope = (scope || "").toLowerCase();
   const canSeeUpload = normalizedScope === "admin" || role !== "user";
   const canChangePassword = ["employee", "admin"].includes(role);
+  const isTemporary = role === "temporary";
 
   const handleLogout = async () => {
     setBusy(true);
@@ -74,34 +75,36 @@ export function NavBar() {
               Admin
             </Link>
           ) : null}
-          {canChangePassword ? (
-            <button
-              type="button"
-              onClick={() => setShowPasswordChange(true)}
-              className="hidden sm:inline text-foreground/60 hover:underline"
-              title="Click to change password"
-            >
-              {typeof user?.display_name === "string" && user.display_name
-                ? user.display_name
-                : typeof user?.username === "string" && user.username
-                ? user.username
-                : typeof user?.email === "string"
-                ? user.email
-                : "Profile"}
-            </button>
-          ) : (
-            <Link
-              href="/profile"
-              className="hidden sm:inline text-foreground/60 hover:underline"
-            >
-              {typeof user?.display_name === "string" && user.display_name
-                ? user.display_name
-                : typeof user?.username === "string" && user.username
-                ? user.username
-                : typeof user?.email === "string"
-                ? user.email
-                : "Profile"}
-            </Link>
+          {!isTemporary && (
+            canChangePassword ? (
+              <button
+                type="button"
+                onClick={() => setShowPasswordChange(true)}
+                className="hidden sm:inline text-foreground/60 hover:underline"
+                title="Click to change password"
+              >
+                {typeof user?.display_name === "string" && user.display_name
+                  ? user.display_name
+                  : typeof user?.username === "string" && user.username
+                  ? user.username
+                  : typeof user?.email === "string"
+                  ? user.email
+                  : "Profile"}
+              </button>
+            ) : (
+              <Link
+                href="/profile"
+                className="hidden sm:inline text-foreground/60 hover:underline"
+              >
+                {typeof user?.display_name === "string" && user.display_name
+                  ? user.display_name
+                  : typeof user?.username === "string" && user.username
+                  ? user.username
+                  : typeof user?.email === "string"
+                  ? user.email
+                  : "Profile"}
+              </Link>
+            )
           )}
           <button
             type="button"
