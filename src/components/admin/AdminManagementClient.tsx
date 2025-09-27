@@ -111,6 +111,46 @@ export function AdminManagementClient() {
     }
   }
 
+  async function refreshSpecificUsers(userType: 'temporary' | 'employee') {
+    try {
+      if (!accessToken) throw new Error("Not authenticated");
+      const res = await fetchAdminUsers({}, accessToken);
+      const list = Array.isArray(res)
+        ? res
+        : Array.isArray(res.items)
+        ? res.items
+        : [];
+
+      // Only update users of the specific type
+      const newUsers = list as UserItem[];
+      setUsers(prevUsers => {
+        // Keep existing users that are not of the target type
+        const keepUsers = prevUsers.filter(user => {
+          if (userType === 'temporary') {
+            return (user.role || "").toLowerCase() !== "temporary";
+          } else if (userType === 'employee') {
+            return user.role !== "employer";
+          }
+          return true;
+        });
+
+        // Add the refreshed users of the target type
+        const refreshedUsers = newUsers.filter(user => {
+          if (userType === 'temporary') {
+            return (user.role || "").toLowerCase() === "temporary";
+          } else if (userType === 'employee') {
+            return user.role === "employer";
+          }
+          return false;
+        });
+
+        return [...keepUsers, ...refreshedUsers];
+      });
+    } catch (err: any) {
+      setError(err?.message || "Failed to refresh data");
+    }
+  }
+
   const activeRecords =
     view === "homeworks"
       ? homeworks
@@ -924,7 +964,7 @@ export function AdminManagementClient() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => void loadData("users")}
+                onClick={() => void refreshSpecificUsers('temporary')}
                 className="rounded-lg border border-foreground/20 px-3 py-1 text-xs hover:bg-foreground/10"
               >
                 Refresh
@@ -984,7 +1024,7 @@ export function AdminManagementClient() {
                                 !user.blocked,
                                 accessToken
                               );
-                              await loadData("users");
+                              await refreshSpecificUsers('temporary');
                             } catch (err: any) {
                               setError(err?.message || "Block/Unblock failed");
                             } finally {
@@ -1011,7 +1051,7 @@ export function AdminManagementClient() {
                                 throw new Error("Not authenticated");
                               setBlockingIds((prev) => [...prev, user.id]);
                               await deleteAdminUser(user.id, accessToken);
-                              await loadData("users");
+                              await refreshSpecificUsers('temporary');
                             } catch (err: any) {
                               setError(err?.message || "Delete failed");
                             } finally {
@@ -1041,7 +1081,7 @@ export function AdminManagementClient() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => void loadData("users")}
+                onClick={() => void refreshSpecificUsers('employee')}
                 className="rounded-lg border border-foreground/20 px-3 py-1 text-xs hover:bg-foreground/10"
               >
                 Refresh
@@ -1099,7 +1139,7 @@ export function AdminManagementClient() {
                                 !user.blocked,
                                 accessToken
                               );
-                              await loadData("users");
+                              await refreshSpecificUsers('employee');
                             } catch (err: any) {
                               setError(err?.message || "Block/Unblock failed");
                             } finally {
@@ -1126,7 +1166,7 @@ export function AdminManagementClient() {
                                 throw new Error("Not authenticated");
                               setBlockingIds((prev) => [...prev, user.id]);
                               await deleteAdminUser(user.id, accessToken);
-                              await loadData("users");
+                              await refreshSpecificUsers('employee');
                             } catch (err: any) {
                               setError(err?.message || "Delete failed");
                             } finally {
