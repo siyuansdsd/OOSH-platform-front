@@ -133,7 +133,8 @@ export function AdminManagementClient() {
           if (userType === "temporary") {
             return (user.role || "").toLowerCase() !== "temporary";
           } else if (userType === "employee") {
-            return user.role !== "employer" && user.role !== "employee";
+            const r = (user.role || "").toLowerCase();
+            return r !== "employee";
           }
           return true;
         });
@@ -143,7 +144,8 @@ export function AdminManagementClient() {
           if (userType === "temporary") {
             return (user.role || "").toLowerCase() === "temporary";
           } else if (userType === "employee") {
-            return user.role === "employer" || user.role === "employee";
+            const r = (user.role || "").toLowerCase();
+            return r === "employee";
           }
           return false;
         });
@@ -388,7 +390,11 @@ export function AdminManagementClient() {
   );
 
   const employerUsers = useMemo(
-    () => users.filter((user) => user.role === "employer" || user.role === "employee"),
+    () =>
+      users.filter((user) => {
+        const r = (user.role || "").toLowerCase();
+        return r === "employee";
+      }),
     [users]
   );
 
@@ -1546,7 +1552,8 @@ export function AdminManagementClient() {
                       />
                     </label>
                   </>
-                ) : editingUser.role === "employer" || editingUser.role === "employee" ? (
+                ) : (editingUser.role || "").toLowerCase() === "employer" ||
+                  (editingUser.role || "").toLowerCase() === "employee" ? (
                   // Employer user: display_name, email, password
                   <>
                     <label className="text-sm text-foreground/80">
