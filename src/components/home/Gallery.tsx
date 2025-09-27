@@ -427,15 +427,15 @@ export function Gallery({
       {modalItem ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8 sm:px-6">
           <div
-            className="absolute inset-0 bg-black/70"
+            className="absolute inset-0 bg-gradient-to-br from-purple-900/80 via-blue-900/80 to-teal-900/80"
             onClick={closeModal}
             aria-hidden="true"
           />
-          <div className="relative z-10 max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-background/95 p-4 text-foreground shadow-2xl backdrop-blur sm:p-6">
+          <div className="relative z-10 max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-gradient-to-br from-white/95 to-white/90 p-4 text-foreground shadow-2xl backdrop-blur sm:p-6">
             <button
               type="button"
               onClick={closeModal}
-              className="absolute right-4 top-4 h-10 w-10 rounded-full bg-foreground/10 text-2xl font-semibold text-foreground/80 transition hover:bg-foreground/20"
+              className="absolute right-4 top-4 z-20 h-10 w-10 rounded-full bg-foreground/10 text-2xl font-semibold text-foreground/80 transition hover:bg-foreground/20"
               aria-label="Close"
             >
               ×
@@ -474,8 +474,14 @@ export function Gallery({
                               Your browser does not support the video tag.
                             </video>
                           ) : (
-                            <div className="flex h-full w-full items-center justify-center p-4">
-                              <WebsitePreview url={media.src} interactive={false} />
+                            <div className="flex h-full w-full items-center justify-center bg-white">
+                              <iframe
+                                src={media.src}
+                                loading="lazy"
+                                sandbox="allow-scripts allow-same-origin allow-popups"
+                                className="h-full w-full border-0"
+                                title="Website preview"
+                              />
                             </div>
                           )}
                         </div>
@@ -483,7 +489,7 @@ export function Gallery({
                     </div>
                     {mediaItems.length > 1 ? (
                       <>
-                        <span className="absolute right-4 top-4 rounded-full bg-black/60 px-3 py-1 text-xs font-medium text-white shadow">
+                        <span className="absolute right-16 top-4 rounded-full bg-black/60 px-3 py-1 text-xs font-medium text-white shadow">
                           {mediaIndex + 1}/{mediaItems.length}
                         </span>
                         <div className="absolute inset-x-0 bottom-4 flex items-center justify-center gap-2">
