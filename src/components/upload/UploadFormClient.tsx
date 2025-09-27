@@ -670,14 +670,14 @@ function TraditionalFields() {
         </>
       ) : (
         <label className="block">
-          <div className="mb-1 text-sm text-foreground/80">Person Name</div>
+          <div className="mb-1 text-sm text-foreground/80">your hacker name</div>
           <input
             value={person_name}
             onChange={(e) => setPersonName(e.target.value)}
             onBlur={(e) => setPersonName(e.target.value.trim())}
             disabled={disabled}
             className={baseInput}
-            placeholder="Enter name (English only)"
+            placeholder="Enter your hacker name"
           />
           <FieldError message={errors.person_name} className="mt-1" />
         </label>
