@@ -23,6 +23,7 @@ export function NavBar() {
   const normalizedScope = (scope || "").toLowerCase();
   const canSeeUpload = normalizedScope === "admin" || role !== "user";
   const canChangePassword = ["employee", "admin"].includes(role);
+  const isTemporaryAccount = role === "temporary";
 
   const handleLogout = async () => {
     setBusy(true);
@@ -99,6 +100,12 @@ export function NavBar() {
                 ? user.email
                 : "Profile"}
             </button>
+          ) : isTemporaryAccount ? (
+            <span className="hidden sm:inline text-foreground/60">
+              {typeof user?.username === "string" && user.username
+                ? user.username
+                : "Temporary User"}
+            </span>
           ) : (
             <Link
               href="/profile"
