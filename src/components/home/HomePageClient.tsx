@@ -67,22 +67,33 @@ export function HomePageClient() {
       if (params.append) setLoadingMore(true);
       else setLoading(true);
       try {
-        const result = await fetchHomeworks({
-          page: params.page,
-          pageSize: PAGE_SIZE,
-          school: params.filters.school || undefined,
-          name: params.filters.name || undefined,
-          category: params.type === "all" ? undefined : params.type,
-          signal: controller.signal,
-        }, accessToken);
+        const result = await fetchHomeworks(
+          {
+            page: params.page,
+            pageSize: PAGE_SIZE,
+            school: params.filters.school || undefined,
+            name: params.filters.name || undefined,
+            category: params.type === "all" ? undefined : params.type,
+            signal: controller.signal,
+          },
+          accessToken
+        );
         if (controller.signal.aborted) return;
-        setItems((prev) => (params.append ? [...prev, ...result.items] : result.items));
+        setItems((prev) => {
+          if (!params.append) return result.items;
+          // Append but avoid duplicates by id while preserving order: existing first, then new unique items
+          const existingIds = new Set(prev.map((it) => it.id));
+          const uniqueNew = result.items.filter(
+            (it) => !existingIds.has(it.id)
+          );
+          return [...prev, ...uniqueNew];
+        });
         setPage(result.page);
         setHasMore(result.hasMore);
       } catch (error: unknown) {
         if (controller.signal.aborted) return;
         setError(
-          error instanceof Error ? error.message : "Failed to load data",
+          error instanceof Error ? error.message : "Failed to load data"
         );
       } finally {
         if (!controller.signal.aborted) {
@@ -100,12 +111,22 @@ export function HomePageClient() {
     if (!accessToken) return;
     if (initialisedRef.current) return;
     initialisedRef.current = true;
-    runFetch({ filters: activeFilters, type: typeFilter, page: 1, append: false });
+    runFetch({
+      filters: activeFilters,
+      type: typeFilter,
+      page: 1,
+      append: false,
+    });
   }, [accessToken, activeFilters, typeFilter, runFetch]);
 
   const handleSearch = () => {
     setActiveFilters(formFilters);
-    runFetch({ filters: formFilters, type: typeFilter, page: 1, append: false });
+    runFetch({
+      filters: formFilters,
+      type: typeFilter,
+      page: 1,
+      append: false,
+    });
   };
 
   const handleTypeChange = (next: FilterValue) => {
@@ -113,12 +134,22 @@ export function HomePageClient() {
   };
 
   const handleRefresh = () => {
-    runFetch({ filters: activeFilters, type: typeFilter, page: 1, append: false });
+    runFetch({
+      filters: activeFilters,
+      type: typeFilter,
+      page: 1,
+      append: false,
+    });
   };
 
   const loadMore = () => {
     if (loadingMore || !hasMore) return;
-    runFetch({ filters: activeFilters, type: typeFilter, page: page + 1, append: true });
+    runFetch({
+      filters: activeFilters,
+      type: typeFilter,
+      page: page + 1,
+      append: true,
+    });
   };
 
   useEffect(() => () => abortRef.current?.abort(), []);
@@ -152,7 +183,8 @@ export function HomePageClient() {
   }, [items, activeFilters]);
 
   const displayItems = useMemo(() => {
-    if (typeFilter === "media") return filteredBySearch.filter((item) => item.hasMedia);
+    if (typeFilter === "media")
+      return filteredBySearch.filter((item) => item.hasMedia);
     if (typeFilter === "website")
       return filteredBySearch.filter((item) => item.hasWebsite);
     return filteredBySearch;
