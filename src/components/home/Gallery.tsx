@@ -233,6 +233,22 @@ export function Gallery({
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+    // Detect mobile devices and tablets (including iPad)
+    const isMobile = useMemo(() => {
+      if (typeof window === 'undefined') return false;
+
+      // Check for touch capability
+      const hasTouchSupport = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+
+      // Traditional mobile/tablet user agents
+      const mobileUserAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+      // Modern iPad detection (iPadOS 13+ reports as desktop Safari)
+      const isIPad = /Macintosh/i.test(navigator.userAgent) && hasTouchSupport;
+
+      return mobileUserAgent || isIPad || hasTouchSupport;
+    }, []);
+
     const badges: Array<{ label: string; variant: "video" | "image" }> = [];
     if (videoCount > 0) {
       if (videoCount - 1 > 0) {
@@ -317,14 +333,61 @@ export function Gallery({
     }
 
     if (videoCount > 0) {
+      // On mobile, show static video poster to avoid touch conflicts
+      if (isMobile) {
+        return (
+          <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-black">
+            <video
+              className="h-full w-full object-cover"
+              src={item.videos[0]}
+              muted
+              playsInline
+              preload="metadata"
+              controls={false}
+              poster=""
+            >
+              Your browser does not support the video tag.
+            </video>
+            {/* Play icon overlay for mobile */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="rounded-full bg-black/60 p-3">
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="white"
+                  className="ml-1"
+                >
+                  <path d="M8 5v14l11-7z"/>
+                </svg>
+              </div>
+            </div>
+            {badges.length > 0 ? (
+              <div className="pointer-events-none absolute right-3 top-3 flex w-32 flex-col items-end gap-1 text-xs font-semibold text-white">
+                {badges.map((badge) => (
+                  <span
+                    key={badge.label}
+                    className={`inline-flex w-full justify-center rounded-full px-3 py-1 ${
+                      badge.variant === "video"
+                        ? "bg-sky-500/80"
+                        : "bg-orange-500/80"
+                    }`}
+                  >
+                    {badge.label}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        );
+      }
+
+      // Desktop version with hover to play
       return (
         <div
           className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-black"
           onMouseEnter={schedulePlay}
           onMouseLeave={stopVideo}
-          onTouchStart={schedulePlay}
-          onTouchEnd={stopVideo}
-          onTouchCancel={stopVideo}
         >
           <video
             ref={videoRef}
