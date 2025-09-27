@@ -917,10 +917,20 @@ export function AdminManagementClient() {
 
       <section className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6">
-          <h2 className="text-lg font-semibold text-foreground">
-            Temporary accounts
-          </h2>
-          {/* description removed per UX request */}
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-foreground">
+              Temporary accounts
+            </h2>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void loadData("users")}
+                className="rounded-lg border border-foreground/20 px-3 py-1 text-xs hover:bg-foreground/10"
+              >
+                Refresh
+              </button>
+            </div>
+          </div>
           {temporaryUsers.length === 0 ? (
             <p className="mt-2 text-sm text-foreground/60">
               No temporary accounts created yet.
@@ -991,6 +1001,29 @@ export function AdminManagementClient() {
                             ? "Unblock"
                             : "Block"}
                         </button>
+                        <button
+                          type="button"
+                          disabled={blockingIds.includes(user.id)}
+                          onClick={async () => {
+                            if (!window.confirm("Are you sure you want to delete this temporary account?")) return;
+                            try {
+                              if (!accessToken)
+                                throw new Error("Not authenticated");
+                              setBlockingIds((prev) => [...prev, user.id]);
+                              await deleteAdminUser(user.id, accessToken);
+                              await loadData("users");
+                            } catch (err: any) {
+                              setError(err?.message || "Delete failed");
+                            } finally {
+                              setBlockingIds((prev) =>
+                                prev.filter((id) => id !== user.id)
+                              );
+                            }
+                          }}
+                          className="rounded-lg border border-red-500/20 bg-red-500/10 px-2 py-1 text-xs text-red-600 hover:bg-red-500/20"
+                        >
+                          {blockingIds.includes(user.id) ? "Processing..." : "Delete"}
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -1001,10 +1034,20 @@ export function AdminManagementClient() {
         </div>
 
         <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6">
-          <h2 className="text-lg font-semibold text-foreground">
-            Employee accounts
-          </h2>
-          {/* description removed per UX request */}
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-foreground">
+              Employee accounts
+            </h2>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => void loadData("users")}
+                className="rounded-lg border border-foreground/20 px-3 py-1 text-xs hover:bg-foreground/10"
+              >
+                Refresh
+              </button>
+            </div>
+          </div>
           {employerUsers.length === 0 ? (
             <p className="mt-2 text-sm text-foreground/60">
               No employee accounts found.
@@ -1072,6 +1115,29 @@ export function AdminManagementClient() {
                             : user.blocked
                             ? "Unblock"
                             : "Block"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={blockingIds.includes(user.id)}
+                          onClick={async () => {
+                            if (!window.confirm("Are you sure you want to delete this employee account?")) return;
+                            try {
+                              if (!accessToken)
+                                throw new Error("Not authenticated");
+                              setBlockingIds((prev) => [...prev, user.id]);
+                              await deleteAdminUser(user.id, accessToken);
+                              await loadData("users");
+                            } catch (err: any) {
+                              setError(err?.message || "Delete failed");
+                            } finally {
+                              setBlockingIds((prev) =>
+                                prev.filter((id) => id !== user.id)
+                              );
+                            }
+                          }}
+                          className="rounded-lg border border-red-500/20 bg-red-500/10 px-2 py-1 text-xs text-red-600 hover:bg-red-500/20"
+                        >
+                          {blockingIds.includes(user.id) ? "Processing..." : "Delete"}
                         </button>
                       </td>
                     </tr>
