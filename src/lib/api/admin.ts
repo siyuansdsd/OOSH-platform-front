@@ -1,6 +1,6 @@
 import { fetchHomeworks, type HomeworkRecord } from "./homeworks";
 
-export type Role = "temporary" | "standard" | "admin" | "employer";
+export type Role = "temporary" | "standard" | "admin" | "employer" | "employee";
 export type AdminUserStatus = "active" | "disabled" | "banned";
 
 export type UserItem = {
@@ -257,7 +257,7 @@ export async function createEmployerAccounts(
 ) {
   return send<{ created: string[] }>(`/api/users`, {
     method: "POST",
-    body: JSON.stringify({ action: "createEmployerBatch", ...input }),
+    body: JSON.stringify({ action: "createEmployerBatch", role: "employee", ...input }),
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -276,7 +276,7 @@ export async function createEmployerAccount(
   // Post a single employer account to the proxy. Backend may accept a single-create action.
   return send<UserItem>(`/api/users`, {
     method: "POST",
-    body: JSON.stringify({ action: "createEmployer", ...input }),
+    body: JSON.stringify({ action: "createEmployer", role: "employee", ...input }),
     headers: {
       Authorization: `Bearer ${token}`,
     },

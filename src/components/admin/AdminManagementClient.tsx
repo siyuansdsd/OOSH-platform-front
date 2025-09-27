@@ -143,7 +143,7 @@ export function AdminManagementClient() {
           if (userType === "temporary") {
             return (user.role || "").toLowerCase() === "temporary";
           } else if (userType === "employee") {
-            return user.role === "employer";
+            return user.role === "employer" || user.role === "employee";
           }
           return false;
         });
@@ -388,7 +388,7 @@ export function AdminManagementClient() {
   );
 
   const employerUsers = useMemo(
-    () => users.filter((user) => user.role === "employer"),
+    () => users.filter((user) => user.role === "employer" || user.role === "employee"),
     [users]
   );
 
@@ -1546,7 +1546,7 @@ export function AdminManagementClient() {
                       />
                     </label>
                   </>
-                ) : editingUser.role === "employer" ? (
+                ) : editingUser.role === "employer" || editingUser.role === "employee" ? (
                   // Employer user: display_name, email, password
                   <>
                     <label className="text-sm text-foreground/80">
