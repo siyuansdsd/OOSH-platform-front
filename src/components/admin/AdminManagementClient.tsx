@@ -39,7 +39,8 @@ type EditingItem =
 const linkClass = "font-semibold italic underline";
 
 export function AdminManagementClient() {
-  const { accessToken } = useAuth();
+  const { accessToken, user } = useAuth();
+  const isEmployee = (user?.role || "").toLowerCase() === "employee";
   const [view, setView] = useState<ViewMode>("homeworks");
   const [homeworks, setHomeworks] = useState<AdminHomeworkRecord[]>([]);
   const [users, setUsers] = useState<UserItem[]>([]);
@@ -68,6 +69,12 @@ export function AdminManagementClient() {
   );
 
   useEffect(() => {
+    // Redirect employee users away from users view
+    if (isEmployee && view === "users") {
+      setView("homeworks");
+      return;
+    }
+
     if (!accessToken) return;
     // Only auto-load when we don't already have data for the selected view.
     // This preserves the resource-saving behavior (no reload on every tab
@@ -77,7 +84,7 @@ export function AdminManagementClient() {
     if (view === "users" && users.length > 0) return;
     void loadData(view);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accessToken, view]);
+  }, [accessToken, view, isEmployee]);
 
   // track which user rows are expanded to show full record details
   const [expandedUserIds, setExpandedUserIds] = useState<string[]>([]);
@@ -585,17 +592,19 @@ export function AdminManagementClient() {
           >
             Homeworks
           </button>
-          <button
-            type="button"
-            onClick={() => setView("users")}
-            className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-              view === "users"
-                ? "bg-foreground text-background"
-                : "bg-foreground/10 text-foreground hover:bg-foreground/20"
-            }`}
-          >
-            Users
-          </button>
+          {!isEmployee && (
+            <button
+              type="button"
+              onClick={() => setView("users")}
+              className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                view === "users"
+                  ? "bg-foreground text-background"
+                  : "bg-foreground/10 text-foreground hover:bg-foreground/20"
+              }`}
+            >
+              Users
+            </button>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <input
@@ -627,7 +636,7 @@ export function AdminManagementClient() {
                 ? "Deleting..."
                 : "Delete selected"}
             </button>
-          ) : (
+          ) : !isEmployee ? (
             <div className="flex items-center gap-2">
               <button
                 type="button"
@@ -675,7 +684,7 @@ export function AdminManagementClient() {
                   : "Unblock selected accounts"}
               </button>
             </div>
-          )}
+          ) : null}
         </div>
       </header>
 
@@ -856,10 +865,11 @@ export function AdminManagementClient() {
         </table>
       </div>
 
-      <section className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6">
-          <h2 className="text-lg font-semibold text-foreground">
-            Temporary accounts
+      {!isEmployee && (
+        <section className="grid gap-6 lg:grid-cols-2">
+          <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6">
+            <h2 className="text-lg font-semibold text-foreground">
+              Temporary accounts
           </h2>
           <p className="mt-1 text-sm text-foreground/60">
             Quickly generate temporary login credentials.
@@ -1010,8 +1020,10 @@ export function AdminManagementClient() {
           </div>
         </div>
       </section>
+      )}
 
-      <section className="grid gap-6 lg:grid-cols-2">
+      {!isEmployee && (
+        <section className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-semibold text-foreground">
@@ -1258,6 +1270,7 @@ export function AdminManagementClient() {
           )}
         </div>
       </section>
+      )}
 
       {editing ? (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
