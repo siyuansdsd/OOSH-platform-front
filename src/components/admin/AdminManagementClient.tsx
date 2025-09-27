@@ -133,7 +133,7 @@ export function AdminManagementClient() {
           if (userType === "temporary") {
             return (user.role || "").toLowerCase() !== "temporary";
           } else if (userType === "employee") {
-            return user.role !== "employer";
+            return user.role !== "employer" && user.role !== "employee";
           }
           return true;
         });
