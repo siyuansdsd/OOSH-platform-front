@@ -515,21 +515,12 @@ export function AdminManagementClient() {
       className="border-b border-foreground/10 hover:bg-foreground/5"
     >
       <td className="whitespace-nowrap px-3 py-3">
-        <div className="flex items-center gap-3">
-          <input
-            type="checkbox"
-            checked={selectedIds.includes(record.id)}
-            onChange={() => toggleSelection(record.id)}
-            className="size-4"
-          />
-          <button
-            type="button"
-            onClick={() => openUserEditor(record)}
-            className="rounded-lg border border-foreground/20 px-2 py-1 text-xs"
-          >
-            Edit
-          </button>
-        </div>
+        <input
+          type="checkbox"
+          checked={selectedIds.includes(record.id)}
+          onChange={() => toggleSelection(record.id)}
+          className="size-4"
+        />
       </td>
       <td className="px-3 py-3 text-sm font-medium text-foreground">
         {record.username}
@@ -545,24 +536,6 @@ export function AdminManagementClient() {
         ) : (
           "—"
         )}
-      </td>
-      <td className="px-3 py-3 text-sm text-foreground/70">
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-xs">
-            {passwordVisibility[record.id]
-              ? (record.password_hash || "No password")
-              : "••••••••"
-            }
-          </span>
-          <button
-            type="button"
-            onClick={() => togglePasswordVisibility(record.id)}
-            className="text-xs text-foreground/60 hover:text-foreground"
-            title={passwordVisibility[record.id] ? "Hide password" : "Show password"}
-          >
-            {passwordVisibility[record.id] ? "👁️" : "👁️‍🗨️"}
-          </button>
-        </div>
       </td>
       <td className="px-3 py-3 text-sm text-foreground">
         {String(record.role).charAt(0).toUpperCase() +
@@ -747,7 +720,6 @@ export function AdminManagementClient() {
                 <th className="px-3 py-3">Username</th>
                 <th className="px-3 py-3">Display Name</th>
                 <th className="px-3 py-3">Email</th>
-                <th className="px-3 py-3">Password</th>
                 <th className="px-3 py-3">Role</th>
                 <th className="px-3 py-3">Status</th>
                 <th className="px-3 py-3">Created</th>
@@ -762,7 +734,7 @@ export function AdminManagementClient() {
             {loading ? (
               <tr>
                 <td
-                  colSpan={view === "homeworks" ? 10 : 11}
+                  colSpan={view === "homeworks" ? 10 : 10}
                   className="px-3 py-6 text-center text-foreground/60"
                 >
                   Loading…
@@ -771,7 +743,7 @@ export function AdminManagementClient() {
             ) : filteredRecords.length === 0 ? (
               <tr>
                 <td
-                  colSpan={view === "homeworks" ? 10 : 11}
+                  colSpan={view === "homeworks" ? 10 : 10}
                   className="px-3 py-6 text-center text-foreground/60"
                 >
                   No records found.
@@ -787,7 +759,7 @@ export function AdminManagementClient() {
                 const detailsRow = (
                   <tr key={`${record.id}-details`} className="bg-background/5">
                     <td
-                      colSpan={11}
+                      colSpan={10}
                       className="px-3 py-3 text-sm text-foreground/70"
                     >
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-6xl">
@@ -1081,7 +1053,6 @@ export function AdminManagementClient() {
                 <thead className="text-xs font-semibold text-foreground/80">
                   <tr>
                     <th className="px-3 py-2">Username</th>
-                    <th className="px-3 py-2">Password</th>
                     <th className="px-3 py-2">Role</th>
                     <th className="px-3 py-2">Created At</th>
                     <th className="px-3 py-2">State</th>
@@ -1092,24 +1063,6 @@ export function AdminManagementClient() {
                   {temporaryUsers.map((user) => (
                     <tr key={user.id} className="border-t border-foreground/10">
                       <td className="px-3 py-2">{user.username}</td>
-                      <td className="px-3 py-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs">
-                            {passwordVisibility[user.id]
-                              ? (user.password_hash || "No password")
-                              : "••••••••"
-                            }
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => togglePasswordVisibility(user.id)}
-                            className="text-xs text-foreground/60 hover:text-foreground"
-                            title={passwordVisibility[user.id] ? "Hide password" : "Show password"}
-                          >
-                            {passwordVisibility[user.id] ? "👁️" : "👁️‍🗨️"}
-                          </button>
-                        </div>
-                      </td>
                       <td className="px-3 py-2">
                         {String(user.role).charAt(0).toUpperCase() +
                           String(user.role).slice(1)}
