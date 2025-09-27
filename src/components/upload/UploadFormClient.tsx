@@ -12,8 +12,22 @@ import {
 } from "./UploadContext";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { APPROVED_SCHOOLS, type ApprovedSchool } from "@/constants/schools";
+import DOMPurify from "dompurify";
 
 const EN_NAME = /^[A-Za-z ]+$/;
+
+// Sanitize description while preserving line breaks
+const sanitizeDescription = (text: string): string => {
+  if (typeof window === 'undefined') return text;
+
+  // Convert line breaks to a placeholder, sanitize, then restore line breaks
+  const withPlaceholders = text.replace(/\n/g, '___LINEBREAK___');
+  const sanitized = DOMPurify.sanitize(withPlaceholders, {
+    ALLOWED_TAGS: [], // No HTML tags allowed
+    ALLOWED_ATTR: [] // No attributes allowed
+  });
+  return sanitized.replace(/___LINEBREAK___/g, '\n');
+};
 
 function FieldError({
   message,
@@ -108,7 +122,8 @@ export default function UploadFormClient() {
       e.schoolName = "Select a school from the list";
     }
     if (!title.trim()) e.title = "Title is required";
-    if (!description.trim()) e.description = "Description is required";
+    const sanitizedDesc = sanitizeDescription(description.trim());
+    if (!sanitizedDesc) e.description = "Description is required";
 
     if (mode === "file") {
       if (!files.length) e.files = "Please add at least one image or video";
@@ -150,7 +165,7 @@ export default function UploadFormClient() {
           files: files.map((f) => ({ filename: f.name, contentType: f.type })),
           schoolName: schoolName.trim(),
           title: title.trim(),
-          description: description.trim(),
+          description: sanitizeDescription(description),
           groupName: is_team ? groupName.trim() : undefined,
           is_team,
           members: is_team ? trimmedMembers : undefined,
@@ -391,7 +406,7 @@ export default function UploadFormClient() {
               images,
               videos,
               title: title.trim(),
-              description: description.trim(),
+              description: sanitizeDescription(description),
               school_name: schoolName.trim(),
               group_name: is_team ? groupName.trim() : undefined,
               person_name: !is_team ? person_name.trim() : undefined,
@@ -416,7 +431,7 @@ export default function UploadFormClient() {
           school_name: schoolName.trim(),
           is_team,
           title: title.trim(),
-          description: description.trim(),
+          description: sanitizeDescription(description),
           person_name: !is_team ? person_name.trim() : undefined,
           group_name: is_team ? groupName.trim() : undefined,
           members: is_team ? trimmedMembers : undefined,
@@ -559,10 +574,16 @@ function TraditionalFields() {
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          onBlur={(e) => setDescription(e.target.value.trim())}
+          onBlur={(e) => {
+            // Trim only leading/trailing whitespace, preserve internal line breaks
+            const trimmed = e.target.value.replace(/^\s+|\s+$/g, '');
+            const sanitized = sanitizeDescription(trimmed);
+            setDescription(sanitized);
+          }}
           disabled={disabled}
           className={`${baseInput} min-h-[120px] resize-y`}
-          placeholder="Describe the project"
+          placeholder="Describe the project (line breaks allowed)"
+          rows={5}
         />
         <FieldError message={errors.description} className="mt-1" />
       </label>
