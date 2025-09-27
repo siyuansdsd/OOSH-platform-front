@@ -453,48 +453,48 @@ export function AdminManagementClient() {
           : "—"}
       </td>
       <td className="px-3 py-3 text-sm">
-        <div className="flex max-w-xs flex-col gap-1 break-all whitespace-normal">
-          {record.videos.map((video) => (
+        <div className="flex max-w-xs flex-col gap-1">
+          {record.videos.map((video, index) => (
             <a
               key={video}
               href={video}
-              className={`${linkClass} break-all`}
+              className={linkClass}
               target="_blank"
               rel="noreferrer"
             >
-              {video}
+              [video {index + 1}]
             </a>
           ))}
           {record.videos.length === 0 ? "—" : null}
         </div>
       </td>
       <td className="px-3 py-3 text-sm">
-        <div className="flex max-w-xs flex-col gap-1 break-all whitespace-normal">
-          {record.images.map((image) => (
+        <div className="flex max-w-xs flex-col gap-1">
+          {record.images.map((image, index) => (
             <a
               key={image}
               href={image}
-              className={`${linkClass} break-all`}
+              className={linkClass}
               target="_blank"
               rel="noreferrer"
             >
-              {image}
+              [image {index + 1}]
             </a>
           ))}
           {record.images.length === 0 ? "—" : null}
         </div>
       </td>
       <td className="px-3 py-3 text-sm">
-        <div className="flex max-w-xs flex-col gap-1 break-all whitespace-normal">
-          {record.urls.map((url) => (
+        <div className="flex max-w-xs flex-col gap-1">
+          {record.urls.map((url, index) => (
             <a
               key={url}
               href={url}
-              className={`${linkClass} break-all`}
+              className={linkClass}
               target="_blank"
               rel="noreferrer"
             >
-              {url}
+              [link {index + 1}]
             </a>
           ))}
           {record.urls.length === 0 ? "—" : null}
