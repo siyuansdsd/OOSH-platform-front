@@ -458,7 +458,7 @@ export function Gallery({
   return (
     <div className={`flex flex-col gap-6 ${className}`}>
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
-        {gridItems.map((item, index) => {
+        {gridItems.map((item) => {
           const cardTitle =
             item.title ||
             item.groupName ||
@@ -466,7 +466,7 @@ export function Gallery({
             "Untitled project";
           return (
             <article
-              key={`${item.id}-${index}`}
+              key={item.id}
               role="button"
               tabIndex={0}
               onClick={() => openModal(item)}
