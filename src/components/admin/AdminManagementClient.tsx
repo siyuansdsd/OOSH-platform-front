@@ -55,9 +55,12 @@ export function AdminManagementClient() {
   });
   const [creatingTemp, setCreatingTemp] = useState(false);
 
-  const [employerDrafts, setEmployerDrafts] = useState<EmployeeDraft[]>([
-    { display_name: "", email: "", password: "" },
-  ]);
+  interface EmployeeDraftInternal extends EmployeeDraft {
+    username?: string;
+  }
+  const [employerDrafts, setEmployerDrafts] = useState<EmployeeDraftInternal[]>(
+    [{ display_name: "", email: "", password: "", username: "" }]
+  );
   const [creatingEmployers, setCreatingEmployers] = useState(false);
   const [bulkActionLoading, setBulkActionLoading] = useState<string | null>(
     null
@@ -111,7 +114,7 @@ export function AdminManagementClient() {
     }
   }
 
-  async function refreshSpecificUsers(userType: 'temporary' | 'employee') {
+  async function refreshSpecificUsers(userType: "temporary" | "employee") {
     try {
       if (!accessToken) throw new Error("Not authenticated");
       const res = await fetchAdminUsers({}, accessToken);
@@ -123,22 +126,22 @@ export function AdminManagementClient() {
 
       // Only update users of the specific type
       const newUsers = list as UserItem[];
-      setUsers(prevUsers => {
+      setUsers((prevUsers) => {
         // Keep existing users that are not of the target type
-        const keepUsers = prevUsers.filter(user => {
-          if (userType === 'temporary') {
+        const keepUsers = prevUsers.filter((user) => {
+          if (userType === "temporary") {
             return (user.role || "").toLowerCase() !== "temporary";
-          } else if (userType === 'employee') {
+          } else if (userType === "employee") {
             return user.role !== "employer";
           }
           return true;
         });
 
         // Add the refreshed users of the target type
-        const refreshedUsers = newUsers.filter(user => {
-          if (userType === 'temporary') {
+        const refreshedUsers = newUsers.filter((user) => {
+          if (userType === "temporary") {
             return (user.role || "").toLowerCase() === "temporary";
-          } else if (userType === 'employee') {
+          } else if (userType === "employee") {
             return user.role === "employer";
           }
           return false;
@@ -320,7 +323,7 @@ export function AdminManagementClient() {
   const handleCreateEmployers = async () => {
     const accounts = employerDrafts
       .map((draft) => ({
-        username: draft.email.trim(), // Use email as username
+        username: (draft.username || draft.email || "").trim(), // prefer explicit username, fallback to email
         display_name: draft.display_name.trim(),
         email: draft.email.trim(),
         password: draft.password,
@@ -332,7 +335,9 @@ export function AdminManagementClient() {
       if (!accessToken) throw new Error("Not authenticated");
       await createEmployerAccounts({ accounts }, accessToken);
       await loadData("users");
-      setEmployerDrafts([{ display_name: "", email: "", password: "" }]);
+      setEmployerDrafts([
+        { display_name: "", email: "", password: "", username: "" },
+      ]);
     } catch (err: any) {
       setError(err?.message || "Batch create failed");
     } finally {
@@ -891,12 +896,20 @@ export function AdminManagementClient() {
                     value={draft.email}
                     onChange={(e) => {
                       const next = [...employerDrafts];
-                      next[index] = { ...next[index], email: e.target.value };
+                      const emailVal = e.target.value;
+                      next[index] = {
+                        ...next[index],
+                        email: emailVal,
+                        username: emailVal,
+                      };
                       setEmployerDrafts(next);
                     }}
                     className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
                     type="email"
                   />
+                  <div className="mt-1 text-xs text-foreground/60">
+                    Email will be used as the username
+                  </div>
                 </label>
                 <label className="text-sm text-foreground/80">
                   Password
@@ -946,7 +959,12 @@ export function AdminManagementClient() {
             <button
               type="button"
               onClick={handleCreateEmployers}
-              disabled={creatingEmployers}
+              disabled={
+                creatingEmployers ||
+                !employerDrafts.some(
+                  (d) => d.display_name.trim() && d.email.trim() && d.password
+                )
+              }
               className="inline-flex w-fit items-center justify-center rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background disabled:cursor-not-allowed disabled:opacity-60"
             >
               {creatingEmployers ? "Processing…" : "Create employee accounts"}
@@ -964,7 +982,7 @@ export function AdminManagementClient() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => void refreshSpecificUsers('temporary')}
+                onClick={() => void refreshSpecificUsers("temporary")}
                 className="rounded-lg border border-foreground/20 px-3 py-1 text-xs hover:bg-foreground/10"
               >
                 Refresh
@@ -1024,7 +1042,7 @@ export function AdminManagementClient() {
                                 !user.blocked,
                                 accessToken
                               );
-                              await refreshSpecificUsers('temporary');
+                              await refreshSpecificUsers("temporary");
                             } catch (err: any) {
                               setError(err?.message || "Block/Unblock failed");
                             } finally {
@@ -1045,13 +1063,18 @@ export function AdminManagementClient() {
                           type="button"
                           disabled={blockingIds.includes(user.id)}
                           onClick={async () => {
-                            if (!window.confirm("Are you sure you want to delete this temporary account?")) return;
+                            if (
+                              !window.confirm(
+                                "Are you sure you want to delete this temporary account?"
+                              )
+                            )
+                              return;
                             try {
                               if (!accessToken)
                                 throw new Error("Not authenticated");
                               setBlockingIds((prev) => [...prev, user.id]);
                               await deleteAdminUser(user.id, accessToken);
-                              await refreshSpecificUsers('temporary');
+                              await refreshSpecificUsers("temporary");
                             } catch (err: any) {
                               setError(err?.message || "Delete failed");
                             } finally {
@@ -1062,7 +1085,9 @@ export function AdminManagementClient() {
                           }}
                           className="rounded-lg border border-red-500/20 bg-red-500/10 px-2 py-1 text-xs text-red-600 hover:bg-red-500/20"
                         >
-                          {blockingIds.includes(user.id) ? "Processing..." : "Delete"}
+                          {blockingIds.includes(user.id)
+                            ? "Processing..."
+                            : "Delete"}
                         </button>
                       </td>
                     </tr>
@@ -1081,7 +1106,7 @@ export function AdminManagementClient() {
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => void refreshSpecificUsers('employee')}
+                onClick={() => void refreshSpecificUsers("employee")}
                 className="rounded-lg border border-foreground/20 px-3 py-1 text-xs hover:bg-foreground/10"
               >
                 Refresh
@@ -1139,7 +1164,7 @@ export function AdminManagementClient() {
                                 !user.blocked,
                                 accessToken
                               );
-                              await refreshSpecificUsers('employee');
+                              await refreshSpecificUsers("employee");
                             } catch (err: any) {
                               setError(err?.message || "Block/Unblock failed");
                             } finally {
@@ -1160,13 +1185,18 @@ export function AdminManagementClient() {
                           type="button"
                           disabled={blockingIds.includes(user.id)}
                           onClick={async () => {
-                            if (!window.confirm("Are you sure you want to delete this employee account?")) return;
+                            if (
+                              !window.confirm(
+                                "Are you sure you want to delete this employee account?"
+                              )
+                            )
+                              return;
                             try {
                               if (!accessToken)
                                 throw new Error("Not authenticated");
                               setBlockingIds((prev) => [...prev, user.id]);
                               await deleteAdminUser(user.id, accessToken);
-                              await refreshSpecificUsers('employee');
+                              await refreshSpecificUsers("employee");
                             } catch (err: any) {
                               setError(err?.message || "Delete failed");
                             } finally {
@@ -1177,7 +1207,9 @@ export function AdminManagementClient() {
                           }}
                           className="rounded-lg border border-red-500/20 bg-red-500/10 px-2 py-1 text-xs text-red-600 hover:bg-red-500/20"
                         >
-                          {blockingIds.includes(user.id) ? "Processing..." : "Delete"}
+                          {blockingIds.includes(user.id)
+                            ? "Processing..."
+                            : "Delete"}
                         </button>
                       </td>
                     </tr>
