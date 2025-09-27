@@ -41,7 +41,6 @@ const linkClass = "font-semibold italic underline";
 export function AdminManagementClient() {
   const { accessToken, user } = useAuth();
   const isEmployee = (user?.role || "").toLowerCase() === "employee";
-  const canChangePassword = ["employee", "admin"].includes((user?.role || "").toLowerCase());
   const [view, setView] = useState<ViewMode>("homeworks");
   const [homeworks, setHomeworks] = useState<AdminHomeworkRecord[]>([]);
   const [users, setUsers] = useState<UserItem[]>([]);
@@ -69,39 +68,9 @@ export function AdminManagementClient() {
     null
   );
 
-  // Password change modal state
-  const [showPasswordChange, setShowPasswordChange] = useState(false);
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [changingPassword, setChangingPassword] = useState(false);
-
   // Password visibility state
   const [passwordVisibility, setPasswordVisibility] = useState<{[key: string]: boolean}>({});
 
-  const handlePasswordChange = async () => {
-    if (!newPassword || newPassword !== confirmPassword) {
-      setError("Passwords don't match or are empty");
-      return;
-    }
-    if (!user?.id || !accessToken) {
-      setError("Not authenticated");
-      return;
-    }
-
-    setChangingPassword(true);
-    setError(null);
-    try {
-      // Use the admin user update API with password field
-      await updateAdminUser(user.id, { password_hash: newPassword } as any, accessToken);
-      setShowPasswordChange(false);
-      setNewPassword("");
-      setConfirmPassword("");
-    } catch (err: any) {
-      setError(err?.message || "Failed to change password");
-    } finally {
-      setChangingPassword(false);
-    }
-  };
 
   const togglePasswordVisibility = (id: string) => {
     setPasswordVisibility(prev => ({
@@ -667,18 +636,6 @@ export function AdminManagementClient() {
             </button>
           )}
           </div>
-
-          {canChangePassword && (
-            <button
-              type="button"
-              onClick={() => setShowPasswordChange(true)}
-              className="rounded-lg border border-foreground/20 px-3 py-2 text-sm hover:bg-foreground/10 flex items-center gap-2"
-              title="Click to change password"
-            >
-              <span className="text-xs text-foreground/60">👤</span>
-              <span>{user?.username || user?.email || "User"}</span>
-            </button>
-          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <input
@@ -1898,74 +1855,6 @@ export function AdminManagementClient() {
           </div>
         </div>
       ) : null}
-
-      {/* Password Change Modal */}
-      {showPasswordChange && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
-          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl bg-background p-6 text-foreground shadow-xl">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Change Password</h3>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowPasswordChange(false);
-                  setNewPassword("");
-                  setConfirmPassword("");
-                  setError(null);
-                }}
-                className="rounded-lg border border-foreground/20 px-3 py-1 text-sm"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <label className="text-sm text-foreground/80">
-                New Password
-                <input
-                  type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
-                />
-              </label>
-
-              <label className="text-sm text-foreground/80">
-                Confirm Password
-                <input
-                  type="password"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
-                />
-              </label>
-
-              <div className="flex items-center gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowPasswordChange(false);
-                    setNewPassword("");
-                    setConfirmPassword("");
-                    setError(null);
-                  }}
-                  className="rounded-lg border border-foreground/20 px-4 py-2 text-sm"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handlePasswordChange}
-                  disabled={changingPassword || !newPassword || newPassword !== confirmPassword}
-                  className="rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {changingPassword ? "Changing..." : "Change Password"}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
