@@ -144,8 +144,8 @@ export function NavBar() {
 
       {/* Password Change Modal */}
       {showPasswordChange && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
-          <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl bg-background p-6 text-foreground shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md rounded-3xl bg-background p-6 text-foreground shadow-xl">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Change Password</h3>
               <button
