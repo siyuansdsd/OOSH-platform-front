@@ -1083,6 +1083,7 @@ export function AdminManagementClient() {
                     <th className="px-3 py-2">Username</th>
                     <th className="px-3 py-2">Password</th>
                     <th className="px-3 py-2">Role</th>
+                    <th className="px-3 py-2">Created At</th>
                     <th className="px-3 py-2">State</th>
                     <th className="px-3 py-2">Actions</th>
                   </tr>
@@ -1114,19 +1115,12 @@ export function AdminManagementClient() {
                           String(user.role).slice(1)}
                       </td>
                       <td className="px-3 py-2">
+                        {user.created_at ? new Date(user.created_at).toLocaleDateString() : "—"}
+                      </td>
+                      <td className="px-3 py-2">
                         {user.blocked ? "Blocked" : "Active"}
                       </td>
                       <td className="px-3 py-2 flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            openUserEditor(user);
-                            setEditingPassword("");
-                          }}
-                          className="rounded-lg border border-foreground/20 px-2 py-1 text-xs"
-                        >
-                          Edit
-                        </button>
                         <button
                           type="button"
                           disabled={blockingIds.includes(user.id)}
