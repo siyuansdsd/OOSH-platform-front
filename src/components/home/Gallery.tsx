@@ -494,11 +494,11 @@ export function Gallery({
             onClick={closeModal}
             aria-hidden="true"
           />
-          <div className="relative z-10 max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-gradient-to-br from-white/95 to-white/90 p-4 text-foreground shadow-2xl backdrop-blur sm:p-6">
+          <div className="relative z-10 max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-3xl bg-gradient-to-br from-blue-500/95 to-orange-500/95 p-4 text-white shadow-2xl backdrop-blur sm:p-6">
             <button
               type="button"
               onClick={closeModal}
-              className="absolute right-4 top-4 z-20 h-10 w-10 rounded-full bg-foreground/10 text-2xl font-semibold text-foreground/80 transition hover:bg-foreground/20"
+              className="absolute right-4 top-4 z-30 h-10 w-10 rounded-full bg-black/30 text-2xl font-semibold text-white transition hover:bg-black/50"
               aria-label="Close"
             >
               ×
@@ -597,17 +597,17 @@ export function Gallery({
               </div>
 
               <div className="space-y-3">
-                <h2 className="text-xl font-semibold text-foreground sm:text-2xl">{modalTitle}</h2>
+                <h2 className="text-xl font-semibold text-white sm:text-2xl">{modalTitle}</h2>
                 {detailLine ? (
-                  <p className="text-sm text-foreground/60">{detailLine}</p>
+                  <p className="text-sm text-white/80">{detailLine}</p>
                 ) : null}
                 {modalItem.schoolName ? (
-                  <p className="text-xs uppercase tracking-wide text-foreground/40">
+                  <p className="text-xs uppercase tracking-wide text-white/60">
                     {modalItem.schoolName}
                   </p>
                 ) : null}
                 {modalItem.description ? (
-                  <p className="text-sm leading-relaxed text-foreground/80">
+                  <p className="text-sm leading-relaxed text-white/90">
                     {modalItem.description}
                   </p>
                 ) : null}
@@ -621,7 +621,7 @@ export function Gallery({
                       href={url}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-1 rounded-full border border-foreground/20 bg-white/60 px-3 py-1 text-xs font-medium text-foreground shadow-sm transition hover:border-foreground/40 hover:bg-white"
+                      className="inline-flex items-center gap-1 rounded-full border border-white/30 bg-white/20 px-3 py-1 text-xs font-medium text-white shadow-sm transition hover:border-white/50 hover:bg-white/30"
                     >
                       View site
                       <span aria-hidden="true">→</span>
