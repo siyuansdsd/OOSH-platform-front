@@ -62,11 +62,23 @@ export async function DELETE(
         ...(authHeader ? { Authorization: authHeader } : {}),
       },
     });
-    const text = await res.text();
+
+    // If the backend returned No Content (204) or empty body, don't call text()/json()
+    if (res.status === 204) {
+      return new NextResponse(null, { status: 204 });
+    }
+
+    // Try to read text body safely; if none, forward status only
+    const contentType = res.headers.get("content-type");
+    const text = await res.text().catch(() => "");
+    if (!text) {
+      return new NextResponse(null, { status: res.status });
+    }
+
     return new NextResponse(text, {
       status: res.status,
       headers: {
-        "content-type": res.headers.get("content-type") ?? "application/json",
+        "content-type": contentType ?? "application/json",
       },
     });
   } catch (error: unknown) {
