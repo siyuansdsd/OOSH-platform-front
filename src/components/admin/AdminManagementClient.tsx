@@ -16,6 +16,7 @@ import {
   bulkUpdateAdminUsers,
   createTemporaryAccount,
   createEmployerAccounts,
+  createEmployerAccount,
 } from "@/lib/api/admin";
 import { useAuth } from "@/components/auth/AuthProvider";
 
@@ -271,32 +272,34 @@ export function AdminManagementClient() {
   const handleBulkAction = async (
     action: "delete" | "disable" | "ban" | "enable"
   ) => {
-    if (selectedIds.length === 0) return;
     setBulkActionLoading(action);
     try {
       if (!accessToken) throw new Error("Not authenticated");
-      if (view === "homeworks" && action === "delete") {
-        await deleteAdminHomeworks(selectedIds, accessToken);
-        await loadData("homeworks");
-      } else if (view === "users") {
+
+      if (view === "homeworks") {
+        // For homeworks, only delete is supported via this control
+        if (action === "delete") {
+          await deleteAdminHomeworks(selectedIds, accessToken);
+        }
+      } else {
+        // For users
         if (action === "disable" || action === "enable") {
-          // Use individual block API calls for block/unblock operations
+          const block = action === "disable";
           await Promise.all(
-            selectedIds.map((id) =>
-              blockAdminUser(id, action === "disable", accessToken)
-            )
+            selectedIds.map((id) => blockAdminUser(id, block, accessToken))
           );
-        } else if (action === "ban") {
-          // Use individual DELETE API calls for permanent deletion
+        } else if (action === "ban" || action === "delete") {
+          // Permanent deletion
           await Promise.all(
             selectedIds.map((id) => deleteAdminUser(id, accessToken))
           );
         } else {
-          // Use bulk API for other operations (if any remain)
+          // Fallback to bulk API if action supported
           await bulkUpdateAdminUsers({ ids: selectedIds, action }, accessToken);
         }
-        await loadData("users");
       }
+
+      await loadData(view === "homeworks" ? "homeworks" : "users");
       setSelectedIds([]);
     } catch (err: any) {
       setError(err?.message || "Action failed");
@@ -329,17 +332,46 @@ export function AdminManagementClient() {
         password: draft.password,
       }))
       .filter((draft) => draft.display_name && draft.email && draft.password);
-    if (accounts.length === 0) return;
+    if (accounts.length === 0) {
+      setError(
+        "Please provide at least one row with display name, email and password."
+      );
+      return;
+    }
+
+    // Extra validation: each account must have username and password
+    const invalid = accounts.filter((a) => !(a.username && a.password));
+    if (invalid.length > 0) {
+      console.warn(
+        "Invalid employer accounts (missing username/password):",
+        invalid
+      );
+      setError(
+        "One or more accounts are missing username or password. Email will be used as username if provided."
+      );
+      return;
+    }
     setCreatingEmployers(true);
     try {
       if (!accessToken) throw new Error("Not authenticated");
-      await createEmployerAccounts({ accounts }, accessToken);
+
+      // Send accounts one-by-one to backend to surface per-account errors
+      for (const acct of accounts) {
+        try {
+          await createEmployerAccount(acct, accessToken);
+        } catch (err: any) {
+          const msg = err?.message || "Create failed for an account";
+          setError(`Failed to create ${acct.email || acct.username}: ${msg}`);
+          throw err;
+        }
+      }
+
       await loadData("users");
       setEmployerDrafts([
         { display_name: "", email: "", password: "", username: "" },
       ]);
     } catch (err: any) {
-      setError(err?.message || "Batch create failed");
+      if (!error) setError(err?.message || "Batch create failed");
     } finally {
       setCreatingEmployers(false);
     }

@@ -194,10 +194,7 @@ export async function blockAdminUser(
   });
 }
 
-export async function deleteAdminUser(
-  id: string,
-  token: string
-) {
+export async function deleteAdminUser(id: string, token: string) {
   return send<{ ok: boolean }>(`/api/admin/users/${id}`, {
     method: "DELETE",
     headers: {
@@ -246,7 +243,12 @@ export async function createTemporaryAccount(
 }
 
 export interface CreateEmployerAccountsInput {
-  accounts: Array<{ username: string; display_name: string; email: string; password: string }>;
+  accounts: Array<{
+    username: string;
+    display_name: string;
+    email: string;
+    password: string;
+  }>;
 }
 
 export async function createEmployerAccounts(
@@ -256,6 +258,25 @@ export async function createEmployerAccounts(
   return send<{ created: string[] }>(`/api/users`, {
     method: "POST",
     body: JSON.stringify({ action: "createEmployerBatch", ...input }),
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
+export async function createEmployerAccount(
+  input: {
+    username: string;
+    display_name: string;
+    email: string;
+    password: string;
+  },
+  token: string
+) {
+  // Post a single employer account to the proxy. Backend may accept a single-create action.
+  return send<UserItem>(`/api/users`, {
+    method: "POST",
+    body: JSON.stringify({ action: "createEmployer", ...input }),
     headers: {
       Authorization: `Bearer ${token}`,
     },
