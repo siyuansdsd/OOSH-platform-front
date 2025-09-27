@@ -23,7 +23,6 @@ export function NavBar() {
   const normalizedScope = (scope || "").toLowerCase();
   const canSeeUpload = normalizedScope === "admin" || role !== "user";
   const canChangePassword = ["employee", "admin"].includes(role);
-  const isTemporary = role === "temporary";
 
   const handleLogout = async () => {
     setBusy(true);
@@ -75,36 +74,34 @@ export function NavBar() {
               Admin
             </Link>
           ) : null}
-          {!isTemporary && (
-            canChangePassword ? (
-              <button
-                type="button"
-                onClick={() => setShowPasswordChange(true)}
-                className="hidden sm:inline text-foreground/60 hover:underline"
-                title="Click to change password"
-              >
-                {typeof user?.display_name === "string" && user.display_name
-                  ? user.display_name
-                  : typeof user?.username === "string" && user.username
-                  ? user.username
-                  : typeof user?.email === "string"
-                  ? user.email
-                  : "Profile"}
-              </button>
-            ) : (
-              <Link
-                href="/profile"
-                className="hidden sm:inline text-foreground/60 hover:underline"
-              >
-                {typeof user?.display_name === "string" && user.display_name
-                  ? user.display_name
-                  : typeof user?.username === "string" && user.username
-                  ? user.username
-                  : typeof user?.email === "string"
-                  ? user.email
-                  : "Profile"}
-              </Link>
-            )
+          {canChangePassword ? (
+            <button
+              type="button"
+              onClick={() => setShowPasswordChange(true)}
+              className="hidden sm:inline text-foreground/60 hover:underline"
+              title="Click to change password"
+            >
+              {typeof user?.display_name === "string" && user.display_name
+                ? user.display_name
+                : typeof user?.username === "string" && user.username
+                ? user.username
+                : typeof user?.email === "string"
+                ? user.email
+                : "Profile"}
+            </button>
+          ) : (
+            <Link
+              href="/profile"
+              className="hidden sm:inline text-foreground/60 hover:underline"
+            >
+              {typeof user?.display_name === "string" && user.display_name
+                ? user.display_name
+                : typeof user?.username === "string" && user.username
+                ? user.username
+                : typeof user?.email === "string"
+                ? user.email
+                : "Profile"}
+            </Link>
           )}
           <button
             type="button"
@@ -147,8 +144,8 @@ export function NavBar() {
 
       {/* Password Change Modal */}
       {showPasswordChange && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md rounded-3xl bg-background p-6 text-foreground shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" style={{ paddingTop: '10vh' }}>
+          <div className="w-full max-w-md rounded-3xl bg-background p-6 text-foreground shadow-xl" style={{ marginTop: '-5vh' }}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">Change Password</h3>
               <button
