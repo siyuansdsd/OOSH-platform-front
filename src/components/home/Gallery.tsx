@@ -140,22 +140,27 @@ export function Gallery({
   const gridItems = useMemo(() => items ?? [], [items]);
 
   const modalTitle = modalItem
-    ? modalItem.title || modalItem.groupName || modalItem.personName || "Project"
+    ? modalItem.title ||
+      modalItem.groupName ||
+      modalItem.personName ||
+      "Project"
     : "";
   const modalStudents = modalItem
     ? Array.from(
-        new Set(
-          [
-            ...(modalItem.members || []),
-            ...(modalItem.personName ? [modalItem.personName] : []),
-          ]
-        )
+        new Set([
+          ...(modalItem.members || []),
+          ...(modalItem.personName ? [modalItem.personName] : []),
+        ])
       )
     : [];
 
   const mediaItems = useMemo(() => {
-    if (!modalItem) return [] as Array<{ type: "image" | "video" | "website"; src: string }>;
-    const itemsList: Array<{ type: "image" | "video" | "website"; src: string }> = [];
+    if (!modalItem)
+      return [] as Array<{ type: "image" | "video" | "website"; src: string }>;
+    const itemsList: Array<{
+      type: "image" | "video" | "website";
+      src: string;
+    }> = [];
     modalItem.images.forEach((src) => {
       if (src) itemsList.push({ type: "image", src });
     });
@@ -235,13 +240,17 @@ export function Gallery({
 
     // Detect mobile devices and tablets (including iPad)
     const isMobile = useMemo(() => {
-      if (typeof window === 'undefined') return false;
+      if (typeof window === "undefined") return false;
 
       // Check for touch capability
-      const hasTouchSupport = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+      const hasTouchSupport =
+        "ontouchstart" in window || navigator.maxTouchPoints > 0;
 
       // Traditional mobile/tablet user agents
-      const mobileUserAgent = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const mobileUserAgent =
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+          navigator.userAgent
+        );
 
       // Modern iPad detection (iPadOS 13+ reports as desktop Safari)
       const isIPad = /Macintosh/i.test(navigator.userAgent) && hasTouchSupport;
@@ -254,7 +263,9 @@ export function Gallery({
       if (videoCount - 1 > 0) {
         badges.push({
           label:
-            videoCount - 1 === 1 ? "+1 more video" : `+${videoCount - 1} more videos`,
+            videoCount - 1 === 1
+              ? "+1 more video"
+              : `+${videoCount - 1} more videos`,
           variant: "video",
         });
       }
@@ -309,7 +320,9 @@ export function Gallery({
         <div className="group relative aspect-[4/3] w-full overflow-hidden rounded-2xl">
           <img
             src={item.images[0]}
-            alt={item.title || item.groupName || item.personName || "Project image"}
+            alt={
+              item.title || item.groupName || item.personName || "Project image"
+            }
             className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
           />
           {badges.length > 0 ? (
@@ -358,7 +371,7 @@ export function Gallery({
                   fill="white"
                   className="ml-1"
                 >
-                  <path d="M8 5v14l11-7z"/>
+                  <path d="M8 5v14l11-7z" />
                 </svg>
               </div>
             </div>
@@ -434,7 +447,9 @@ export function Gallery({
 
   if (!loading && gridItems.length === 0) {
     return (
-      <div className={`rounded-3xl border border-foreground/10 bg-white/5 p-10 text-center text-sm text-foreground/60 ${className}`}>
+      <div
+        className={`rounded-3xl border border-foreground/10 bg-white/5 p-10 text-center text-sm text-foreground/60 ${className}`}
+      >
         {emptyState ?? "No items found."}
       </div>
     );
@@ -445,7 +460,10 @@ export function Gallery({
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
         {gridItems.map((item, index) => {
           const cardTitle =
-            item.title || item.groupName || item.personName || "Untitled project";
+            item.title ||
+            item.groupName ||
+            item.personName ||
+            "Untitled project";
           return (
             <article
               key={`${item.id}-${index}`}
@@ -490,7 +508,7 @@ export function Gallery({
       {modalItem ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8 sm:px-6">
           <div
-            className="absolute inset-0 bg-gradient-to-br from-purple-900/80 via-blue-900/80 to-teal-900/80"
+            className="absolute inset-0 bg-black/40"
             onClick={closeModal}
             aria-hidden="true"
           />
@@ -597,7 +615,9 @@ export function Gallery({
               </div>
 
               <div className="space-y-3">
-                <h2 className="text-xl font-semibold text-white sm:text-2xl">{modalTitle}</h2>
+                <h2 className="text-xl font-semibold text-white sm:text-2xl">
+                  {modalTitle}
+                </h2>
                 {detailLine ? (
                   <p className="text-sm text-white/80">{detailLine}</p>
                 ) : null}
