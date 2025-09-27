@@ -47,13 +47,23 @@ export function NavBar() {
     setChangingPassword(true);
     setError(null);
     try {
+      // Debug log for troubleshooting
+      console.log("Attempting password change for user:", { role, scope, normalizedScope });
+
       // Use the PATCH /api/users/me endpoint
       await updateCurrentUser({ password: newPassword }, accessToken);
       setShowPasswordChange(false);
       setNewPassword("");
       setConfirmPassword("");
     } catch (err: any) {
-      setError(err?.message || "Failed to change password");
+      console.error("Password change error:", err);
+
+      // Check if it's a 403 error and provide more specific feedback
+      if (err?.message?.includes('403') || err?.message?.toLowerCase().includes('forbidden')) {
+        setError(`Access denied. User role: ${role}, scope: ${scope}. You may not have permission to change your password through this interface.`);
+      } else {
+        setError(err?.message || "Failed to change password");
+      }
     } finally {
       setChangingPassword(false);
     }

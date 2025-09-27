@@ -268,13 +268,20 @@ export async function updateCurrentUser(
   payload: { password?: string },
   token: string
 ) {
-  return send<UserItem>(`/api/users/me`, {
-    method: "PATCH",
-    body: JSON.stringify(payload),
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
-  });
+  try {
+    return await send<UserItem>(`/api/users/me`, {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  } catch (error: any) {
+    // If we get a 403, it might be due to scope/permission issues
+    // The backend might be expecting a different request format or scope
+    console.error("updateCurrentUser failed:", error);
+    throw error;
+  }
 }
 
 export async function createEmployerAccount(
