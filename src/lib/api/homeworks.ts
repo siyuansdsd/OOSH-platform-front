@@ -36,7 +36,7 @@ export interface HomeworkListResult {
   raw?: unknown;
 }
 
-const pick = <T,>(...vals: Array<T | undefined | null>): T | undefined =>
+const pick = <T>(...vals: Array<T | undefined | null>): T | undefined =>
   vals.find((v) => v !== undefined && v !== null);
 
 const pickFromSources = (
@@ -85,27 +85,30 @@ const findUrl = (value: unknown, depth = 0): string | undefined => {
     return undefined;
   }
   if (isRecord(value) && depth < 5) {
-    const direct = pickFromSources([value], [
-      "url",
-      "href",
-      "src",
-      "link",
-      "linkUrl",
-      "link_url",
-      "fileUrl",
-      "file_url",
-      "publicUrl",
-      "public_url",
-      "downloadUrl",
-      "download_url",
-      "videoUrl",
-      "video_url",
-      "signedUrl",
-      "signed_url",
-      "assetUrl",
-      "asset_url",
-      "path",
-    ]);
+    const direct = pickFromSources(
+      [value],
+      [
+        "url",
+        "href",
+        "src",
+        "link",
+        "linkUrl",
+        "link_url",
+        "fileUrl",
+        "file_url",
+        "publicUrl",
+        "public_url",
+        "downloadUrl",
+        "download_url",
+        "videoUrl",
+        "video_url",
+        "signedUrl",
+        "signed_url",
+        "assetUrl",
+        "asset_url",
+        "path",
+      ]
+    );
     if (typeof direct === "string" && looksLikeUrl(direct)) {
       return direct.trim();
     }
@@ -133,12 +136,10 @@ const toPlainStringArray = (value: unknown) =>
     .map((entry) => {
       if (typeof entry === "string") return entry.trim();
       if (isRecord(entry)) {
-        const candidate = pickFromSources([entry], [
-          "name",
-          "value",
-          "label",
-          "text",
-        ]);
+        const candidate = pickFromSources(
+          [entry],
+          ["name", "value", "label", "text"]
+        );
         if (typeof candidate === "string") return candidate.trim();
       }
       return "";
@@ -290,11 +291,20 @@ const extractList = (
   return { items: toUnknownArray(payload), meta: payload };
 };
 
-export const fetchHomeworks = async (params: HomeworkListParams = {}, token?: string) => {
+export const fetchHomeworks = async (
+  params: HomeworkListParams = {},
+  token?: string
+) => {
   const searchParams = new URLSearchParams();
-  if (params.page && params.page > 0) searchParams.set("page", String(params.page));
-  if (params.pageSize && params.pageSize > 0)
+  if (params.page && params.page > 0)
+    searchParams.set("page", String(params.page));
+  if (params.pageSize && params.pageSize > 0) {
+    // Primary param name
     searchParams.set("pageSize", String(params.pageSize));
+    // Also send common aliases for compatibility with backends that expect different names
+    searchParams.set("per_page", String(params.pageSize));
+    searchParams.set("limit", String(params.pageSize));
+  }
   if (params.school) searchParams.set("school", params.school);
   if (params.name) searchParams.set("name", params.name);
   if (params.category && params.category !== "all")
@@ -312,9 +322,7 @@ export const fetchHomeworks = async (params: HomeworkListParams = {}, token?: st
       : undefined,
   });
   if (!res.ok) {
-    const message = await res
-      .text()
-      .catch(() => `HTTP ${res.status}`);
+    const message = await res.text().catch(() => `HTTP ${res.status}`);
     const error = new Error(message || `HTTP ${res.status}`);
     Object.assign(error, { status: res.status });
     throw error;
@@ -354,7 +362,8 @@ export const fetchHomeworks = async (params: HomeworkListParams = {}, token?: st
     "limit",
     "size",
   ]);
-  const pageSize = toFiniteNumber(pageSizeRaw) ?? params.pageSize ?? items.length;
+  const pageSize =
+    toFiniteNumber(pageSizeRaw) ?? params.pageSize ?? items.length;
 
   const safeTotal = total < 0 ? rawItems.length : total;
   const safePage = page < 1 ? 1 : page;
