@@ -264,6 +264,19 @@ export async function createEmployerAccounts(
   });
 }
 
+export async function updateCurrentUser(
+  payload: { password?: string },
+  token: string
+) {
+  return send<UserItem>(`/api/users/me`, {
+    method: "PATCH",
+    body: JSON.stringify(payload),
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+}
+
 export async function createEmployerAccount(
   input: {
     username: string;

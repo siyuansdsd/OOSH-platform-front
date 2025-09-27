@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter, usePathname } from "next/navigation";
 import { useState } from "react";
 import { useAuth } from "./AuthProvider";
-import { updateAdminUser } from "@/lib/api/admin";
+import { updateCurrentUser } from "@/lib/api/admin";
 
 export function NavBar() {
   const { user, scope, accessToken, logout } = useAuth();
@@ -39,7 +39,7 @@ export function NavBar() {
       setError("Passwords don't match or are empty");
       return;
     }
-    if (!user?.id || !accessToken) {
+    if (!accessToken) {
       setError("Not authenticated");
       return;
     }
@@ -47,8 +47,8 @@ export function NavBar() {
     setChangingPassword(true);
     setError(null);
     try {
-      // Use the admin user update API with password field
-      await updateAdminUser(user.id, { password_hash: newPassword } as any, accessToken);
+      // Use the PATCH /api/users/me endpoint
+      await updateCurrentUser({ password: newPassword }, accessToken);
       setShowPasswordChange(false);
       setNewPassword("");
       setConfirmPassword("");
