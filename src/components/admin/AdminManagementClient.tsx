@@ -1224,7 +1224,6 @@ export function AdminManagementClient() {
                     <th className="px-3 py-2">Username</th>
                     <th className="px-3 py-2">Display name</th>
                     <th className="px-3 py-2">Email</th>
-                    <th className="px-3 py-2">Password</th>
                     <th className="px-3 py-2">Status</th>
                     <th className="px-3 py-2">Actions</th>
                   </tr>
@@ -1236,37 +1235,9 @@ export function AdminManagementClient() {
                       <td className="px-3 py-2">{user.display_name || "—"}</td>
                       <td className="px-3 py-2">{user.email || "—"}</td>
                       <td className="px-3 py-2">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-xs">
-                            {passwordVisibility[user.id]
-                              ? (user.password_hash || "No password")
-                              : "••••••••"
-                            }
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => togglePasswordVisibility(user.id)}
-                            className="text-xs text-foreground/60 hover:text-foreground"
-                            title={passwordVisibility[user.id] ? "Hide password" : "Show password"}
-                          >
-                            {passwordVisibility[user.id] ? "👁️" : "👁️‍🗨️"}
-                          </button>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2">
                         {user.blocked ? "Blocked" : "Active"}
                       </td>
                       <td className="px-3 py-2 flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            openUserEditor(user);
-                            setEditingPassword("");
-                          }}
-                          className="rounded-lg border border-foreground/20 px-2 py-1 text-xs"
-                        >
-                          Edit
-                        </button>
                         <button
                           type="button"
                           disabled={blockingIds.includes(user.id)}
