@@ -10,7 +10,7 @@ export default function Home() {
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-10">
           <section className="glass-panel rounded-3xl p-8 text-foreground shadow-sm">
             <h1 className="text-3xl font-semibold sm:text-4xl">
-              Discover Max Hacker Tech Club student projects
+              Discover <span className="bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent">Max Hacker Tech Club</span> student projects
             </h1>
             <p className="mt-3 max-w-2xl text-base text-foreground/70">
               Browse video, image and website submissions from schools across

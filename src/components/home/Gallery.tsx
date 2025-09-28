@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { TouchEvent } from "react";
 import type { HomeworkRecord } from "@/lib/api/homeworks";
+import Spinner from "@/components/ui/Spinner";
 
 interface GalleryProps {
   items: HomeworkRecord[];
@@ -529,45 +530,41 @@ export function Gallery({
       </div>
 
       {(() => {
-        const showLoadMore =
-          (rawHasMore !== null && rawHasMore) ||
-          (rawTotal !== null && rawTotal > gridItems.length) ||
-          Boolean(hasMore);
-        const canTrigger = !loadingMore && Boolean(hasMore);
+        const showLoadMore = Boolean(hasMore) || Boolean(loadingMore);
         if (!showLoadMore) return null;
 
         if (isMobileView) {
           return (
             <div className="flex flex-col items-center gap-2">
               <div ref={sentinelRef} className="w-full h-2" />
-              {canTrigger ? (
+              {loadingMore ? (
+                <Spinner label="Loading more" />
+              ) : hasMore ? (
                 <div className="text-sm text-foreground/80">
                   Pull up to load more
                 </div>
-              ) : (
-                <div className="text-sm text-foreground/50">
-                  You've reached the end of the available results.
-                </div>
-              )}
+              ) : null}
             </div>
           );
         }
 
+        if (!hasMore && !loadingMore) {
+          return null;
+        }
+
         return (
           <div className="flex flex-col items-center gap-2">
-            <button
-              type="button"
-              onClick={onLoadMore}
-              disabled={loading || loadingMore || !hasMore}
-              className="mx-auto inline-flex min-h-[2.75rem] min-w-[10rem] items-center justify-center rounded-full border border-foreground/20 bg-white/80 px-6 text-sm font-medium text-foreground shadow-sm transition hover:border-foreground/40 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {loadingMore ? "Loading…" : "Load more"}
-            </button>
-            {!canTrigger ? (
-              <div className="text-sm text-foreground/50">
-                You've reached the end of the available results.
-              </div>
+            {hasMore ? (
+              <button
+                type="button"
+                onClick={onLoadMore}
+                disabled={loading || loadingMore || !hasMore}
+                className="mx-auto inline-flex min-h-[2.75rem] min-w-[10rem] items-center justify-center rounded-full border border-foreground/20 bg-white/80 px-6 text-sm font-medium text-foreground shadow-sm transition hover:border-foreground/40 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {loadingMore ? "Loading…" : "Load more"}
+              </button>
             ) : null}
+            {loadingMore && !hasMore ? <Spinner label="Loading more" /> : null}
           </div>
         );
       })()}
