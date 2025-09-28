@@ -274,22 +274,33 @@ export function Gallery({
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [poster, setPoster] = useState<string | null>(null);
+    const posterGeneratingRef = useRef(false);
 
     useEffect(() => {
       setPoster(null);
+      posterGeneratingRef.current = false;
     }, [item.id]);
 
     useEffect(() => {
       let cancelled = false;
       async function generatePoster() {
-        if (!item.videos[0] || poster) return;
+        if (!item.videos[0] || poster || posterGeneratingRef.current) return;
+        posterGeneratingRef.current = true;
         try {
-          const snapshot = new VideoSnapshot(item.videos[0]);
+          const controller = new AbortController();
+          const res = await fetch(item.videos[0], {
+            mode: "cors",
+            signal: controller.signal,
+          });
+          const blob = await res.blob();
+          if (cancelled) return;
+          const snapshot = new VideoSnapshot(blob);
           const image = await snapshot.takeSnapshot();
           if (!cancelled && image) setPoster(image);
         } catch (error) {
           console.error("Failed to create video poster", error);
         }
+        posterGeneratingRef.current = false;
       }
       void generatePoster();
       return () => {
