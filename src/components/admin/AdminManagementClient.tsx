@@ -639,6 +639,9 @@ export function AdminManagementClient() {
       <td className="whitespace-nowrap px-3 py-3 text-sm text-foreground/70">
         {record.submittedAt || "—"}
       </td>
+      <td className="whitespace-nowrap px-3 py-3 text-sm text-foreground/70">
+        {record.createdAt || "—"}
+      </td>
       <td className="px-3 py-3 text-sm capitalize text-foreground/70">
         {record.status || "pending"}
       </td>
@@ -783,6 +786,7 @@ export function AdminManagementClient() {
                 className="rounded-lg border border-foreground/20 bg-background/70 px-3 py-2 text-sm"
               >
                 <option value="submittedAt">Sort by Submitted</option>
+                <option value="createdAt">Sort by Created</option>
                 <option value="title">Sort by Title</option>
                 <option value="schoolName">Sort by School</option>
                 <option value="personName">Sort by Owner</option>
@@ -907,6 +911,7 @@ export function AdminManagementClient() {
                 <th className="px-3 py-3">Images</th>
                 <th className="px-3 py-3">Websites</th>
                 <th className="px-3 py-3">Submitted</th>
+                <th className="px-3 py-3">Created</th>
                 <th className="px-3 py-3">Status</th>
               </tr>
             ) : (
@@ -936,7 +941,7 @@ export function AdminManagementClient() {
             {loading ? (
               <tr>
                 <td
-                  colSpan={view === "homeworks" ? 10 : 10}
+                  colSpan={view === "homeworks" ? 11 : 11}
                   className="px-3 py-6 text-center text-foreground/60"
                 >
                   Loading…
@@ -946,7 +951,7 @@ export function AdminManagementClient() {
                 .length === 0 ? (
               <tr>
                 <td
-                  colSpan={view === "homeworks" ? 10 : 10}
+                  colSpan={view === "homeworks" ? 11 : 11}
                   className="px-3 py-6 text-center text-foreground/60"
                 >
                   No records found.

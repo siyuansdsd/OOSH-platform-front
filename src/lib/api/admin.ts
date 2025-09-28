@@ -37,6 +37,7 @@ export interface AdminHomeworkRecord {
   urls: string[];
   status?: string;
   submittedAt?: string;
+  createdAt?: string;
   ownerId?: string;
 }
 
@@ -96,7 +97,7 @@ export async function fetchAdminHomeworks(
 }
 
 export async function fetchAllAdminHomeworks(token: string) {
-  const res = await send<{ items: AdminHomeworkRecord[]; total: number; limit: number }>(
+  const res = await send<{ items: any[]; total: number; limit: number }>(
     `/api/homeworks/admin/all`,
     {
       headers: {
@@ -104,7 +105,34 @@ export async function fetchAllAdminHomeworks(token: string) {
       },
     }
   );
-  return res;
+
+  // Transform the raw data to AdminHomeworkRecord format (same as fetchAdminHomeworks)
+  const items: AdminHomeworkRecord[] = res.items.map((item: any) => {
+    const raw = item.raw || item;
+    return {
+      id: item.id,
+      title: item.title,
+      description: item.description,
+      schoolName: item.schoolName,
+      groupName: item.groupName,
+      personName: item.personName,
+      isTeam: item.isTeam,
+      members: item.members,
+      images: item.images || [],
+      videos: item.videos || [],
+      urls: item.urls || [],
+      status: raw?.status || item.status,
+      submittedAt: raw?.submittedAt || item.submittedAt,
+      createdAt: raw?.createdAt || item.createdAt || item.created_at,
+      ownerId: raw?.ownerId || raw?.userId || item.ownerId || item.userId,
+    };
+  });
+
+  return {
+    items,
+    total: res.total,
+    limit: res.limit,
+  };
 }
 
 export async function fetchAdminUsers(
