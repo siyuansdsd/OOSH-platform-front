@@ -2,12 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  fetchAdminHomeworks,
+  fetchAllAdminHomeworks,
   fetchAdminUsers,
   type AdminHomeworkRecord,
   type UserItem,
   type Role,
-  type AdminUserStatus,
   updateAdminHomework,
   deleteAdminHomeworks,
   updateAdminUser,
@@ -15,7 +14,6 @@ import {
   deleteAdminUser,
   bulkUpdateAdminUsers,
   createTemporaryAccount,
-  createEmployerAccounts,
   createEmployerAccount,
 } from "@/lib/api/admin";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -42,7 +40,10 @@ export function AdminManagementClient() {
   const { accessToken, user } = useAuth();
   const isEmployee = (user?.role || "").toLowerCase() === "employee";
   const [view, setView] = useState<ViewMode>("homeworks");
-  const [homeworks, setHomeworks] = useState<AdminHomeworkRecord[]>([]);
+  const [homeworksCache, setHomeworksCache] = useState<AdminHomeworkRecord[]>(
+    []
+  );
+  const [homeworksCacheLoaded, setHomeworksCacheLoaded] = useState(false);
   const [users, setUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -50,6 +51,13 @@ export function AdminManagementClient() {
   const [editing, setEditing] = useState<EditingItem | null>(null);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
+
+  // Client-side pagination and sorting
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+  const [sortField, setSortField] =
+    useState<keyof AdminHomeworkRecord>("submittedAt");
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   const [tempAccount, setTempAccount] = useState({
     username: "",
@@ -68,17 +76,6 @@ export function AdminManagementClient() {
     null
   );
 
-  // Password visibility state
-  const [passwordVisibility, setPasswordVisibility] = useState<{[key: string]: boolean}>({});
-
-
-  const togglePasswordVisibility = (id: string) => {
-    setPasswordVisibility(prev => ({
-      ...prev,
-      [id]: !prev[id]
-    }));
-  };
-
   useEffect(() => {
     // Redirect employee users away from users view
     if (isEmployee && view === "users") {
@@ -87,13 +84,15 @@ export function AdminManagementClient() {
     }
 
     if (!accessToken) return;
-    // Only auto-load when we don't already have data for the selected view.
-    // This preserves the resource-saving behavior (no reload on every tab
-    // switch) while ensuring the first time you switch to Users/Homeworks we
-    // fetch the data if it's empty.
-    if (view === "homeworks" && homeworks.length > 0) return;
-    if (view === "users" && users.length > 0) return;
-    void loadData(view);
+    // For homeworks: load from cache if available, otherwise fetch all
+    if (view === "homeworks" && !homeworksCacheLoaded) {
+      void loadData(view);
+      return;
+    }
+    // For users: only auto-load when we don't already have data
+    if (view === "users" && users.length === 0) {
+      void loadData(view);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, view, isEmployee]);
 
@@ -114,8 +113,11 @@ export function AdminManagementClient() {
     try {
       if (!accessToken) throw new Error("Not authenticated");
       if (mode === "homeworks") {
-        const res = await fetchAdminHomeworks({}, accessToken);
-        setHomeworks(res.items);
+        // Use new API to fetch all homework items
+        const res = await fetchAllAdminHomeworks(accessToken);
+        setHomeworksCache(res.items);
+        setHomeworksCacheLoaded(true);
+        setCurrentPage(1); // Reset to first page when loading new data
       } else {
         const res = await fetchAdminUsers({}, accessToken);
         const list = Array.isArray(res)
@@ -130,6 +132,22 @@ export function AdminManagementClient() {
     } finally {
       setLoading(false);
       setSelectedIds([]);
+    }
+  }
+
+  // Function to refresh homework cache
+  async function refreshHomeworkCache() {
+    if (!accessToken) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetchAllAdminHomeworks(accessToken);
+      setHomeworksCache(res.items);
+      setHomeworksCacheLoaded(true);
+    } catch (err: any) {
+      setError(err?.message || "Failed to refresh homework data");
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -175,19 +193,16 @@ export function AdminManagementClient() {
     }
   }
 
-  const activeRecords =
-    view === "homeworks"
-      ? homeworks
-      : users.filter((user) => {
-          const role = (user.role || "").toLowerCase();
-          return role === "standard" || role === "user";
-        });
+  // Client-side filtering, sorting, and pagination
+  const processedHomeworkRecords = useMemo(() => {
+    if (view !== "homeworks") return [];
 
-  const filteredRecords = useMemo(() => {
+    let records = [...homeworksCache];
+
+    // Apply search filter
     const term = search.trim().toLowerCase();
-    if (!term) return activeRecords;
-    if (view === "homeworks") {
-      return (activeRecords as AdminHomeworkRecord[]).filter((item) => {
+    if (term) {
+      records = records.filter((item) => {
         const haystack = [
           item.title,
           item.description,
@@ -202,6 +217,35 @@ export function AdminManagementClient() {
         return haystack.includes(term);
       });
     }
+
+    // Apply sorting
+    records.sort((a, b) => {
+      const aVal = a[sortField] || "";
+      const bVal = b[sortField] || "";
+
+      const comparison = String(aVal).localeCompare(String(bVal));
+      return sortDirection === "asc" ? comparison : -comparison;
+    });
+
+    return records;
+  }, [homeworksCache, search, sortField, sortDirection, view]);
+
+  const activeRecords =
+    view === "homeworks"
+      ? processedHomeworkRecords
+      : users.filter((user) => {
+          const role = (user.role || "").toLowerCase();
+          return role === "standard" || role === "user";
+        });
+
+  const filteredRecords = useMemo(() => {
+    const term = search.trim().toLowerCase();
+
+    if (view === "homeworks") {
+      return processedHomeworkRecords;
+    }
+
+    if (!term) return activeRecords;
     return (activeRecords as UserItem[]).filter((item) => {
       const haystack = [
         item.username,
@@ -215,7 +259,20 @@ export function AdminManagementClient() {
         .toLowerCase();
       return haystack.includes(term);
     });
-  }, [activeRecords, search, view]);
+  }, [activeRecords, search, view, processedHomeworkRecords]);
+
+  // Client-side pagination
+  const paginatedRecords = useMemo(() => {
+    if (view !== "homeworks") return filteredRecords;
+
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    return filteredRecords.slice(startIndex, endIndex);
+  }, [filteredRecords, currentPage, pageSize, view]);
+
+  const totalPages = Math.ceil(filteredRecords.length / pageSize);
+  const hasNextPage = currentPage < totalPages;
+  const hasPrevPage = currentPage > 1;
 
   const toggleSelection = (id: string) => {
     setSelectedIds((prev) =>
@@ -224,7 +281,9 @@ export function AdminManagementClient() {
   };
 
   const toggleSelectAll = () => {
-    const displayed = filteredRecords.map((item) => item.id);
+    const displayed = (
+      view === "homeworks" ? paginatedRecords : filteredRecords
+    ).map((item) => item.id);
     const displayedSelected = selectedIds.filter((id) =>
       displayed.includes(id)
     );
@@ -255,22 +314,42 @@ export function AdminManagementClient() {
   const handleUpdate = async () => {
     if (!editing) return;
     setSaving(true);
+
+    // Store original values for rollback
+    const originalHomeworksCache = [...homeworksCache];
+    const originalUsers = [...users];
+
     try {
       if (!accessToken) throw new Error("Not authenticated");
+
       if (editing.type === "homeworks") {
-        await updateAdminHomework(editing.draft.id, editing.draft, accessToken);
-        await loadData("homeworks");
+        // Optimistic update: immediately update cache
+        const updatedCache = homeworksCache.map((item) =>
+          item.id === editing.draft.id ? editing.draft : item
+        );
+        setHomeworksCache(updatedCache);
+
+        // Call backend
+        const updatedRecord = await updateAdminHomework(
+          editing.draft.id,
+          editing.draft,
+          accessToken
+        );
+
+        // Reconcile with backend response
+        const reconciledCache = homeworksCache.map((item) =>
+          item.id === editing.draft.id ? updatedRecord : item
+        );
+        setHomeworksCache(reconciledCache);
       } else {
         const draft = editing.draft as UserItem;
 
         // Build payload according to role and provided password
         const payload: Record<string, any> = {};
         if (draft.role === "temporary") {
-          // temporary: only username and password editable
           payload.username = draft.username;
           if (editingPassword) payload.password = editingPassword;
         } else {
-          // employee/employer/standard: allow common fields
           payload.username = draft.username;
           payload.display_name = draft.display_name;
           payload.email = draft.email;
@@ -278,11 +357,33 @@ export function AdminManagementClient() {
           if (editingPassword) payload.password = editingPassword;
         }
 
-        await updateAdminUser(draft.id, payload, accessToken);
-        await loadData("users");
+        // Optimistic update for users
+        const updatedUsers = users.map((user) =>
+          user.id === draft.id ? { ...user, ...payload } : user
+        );
+        setUsers(updatedUsers);
+
+        // Call backend
+        const updatedUser = await updateAdminUser(
+          draft.id,
+          payload,
+          accessToken
+        );
+
+        // Reconcile with backend response
+        const reconciledUsers = users.map((user) =>
+          user.id === draft.id ? updatedUser : user
+        );
+        setUsers(reconciledUsers);
       }
       setEditing(null);
     } catch (err: any) {
+      // Rollback optimistic updates on error
+      if (editing.type === "homeworks") {
+        setHomeworksCache(originalHomeworksCache);
+      } else {
+        setUsers(originalUsers);
+      }
       setError(err?.message || "Update failed");
     } finally {
       setSaving(false);
@@ -293,35 +394,70 @@ export function AdminManagementClient() {
     action: "delete" | "disable" | "ban" | "enable"
   ) => {
     setBulkActionLoading(action);
+
+    // Store original values for rollback
+    const originalHomeworksCache = [...homeworksCache];
+    const originalUsers = [...users];
+
     try {
       if (!accessToken) throw new Error("Not authenticated");
 
       if (view === "homeworks") {
         // For homeworks, only delete is supported via this control
         if (action === "delete") {
+          // Optimistic update: remove items from cache
+          const updatedCache = homeworksCache.filter(
+            (item) => !selectedIds.includes(item.id)
+          );
+          setHomeworksCache(updatedCache);
+
+          // Call backend
           await deleteAdminHomeworks(selectedIds, accessToken);
+
+          // No need to reconcile for deletions, optimistic update is final
         }
       } else {
-        // For users
+        // For users - optimistic updates
         if (action === "disable" || action === "enable") {
           const block = action === "disable";
+
+          // Optimistic update: update blocked status
+          const updatedUsers = users.map((user) =>
+            selectedIds.includes(user.id) ? { ...user, blocked: block } : user
+          );
+          setUsers(updatedUsers);
+
+          // Call backend
           await Promise.all(
             selectedIds.map((id) => blockAdminUser(id, block, accessToken))
           );
         } else if (action === "ban" || action === "delete") {
-          // Permanent deletion
+          // Optimistic update: remove users
+          const updatedUsers = users.filter(
+            (user) => !selectedIds.includes(user.id)
+          );
+          setUsers(updatedUsers);
+
+          // Call backend
           await Promise.all(
             selectedIds.map((id) => deleteAdminUser(id, accessToken))
           );
         } else {
           // Fallback to bulk API if action supported
           await bulkUpdateAdminUsers({ ids: selectedIds, action }, accessToken);
+          // Reload data since we don't know the exact changes
+          await loadData("users");
         }
       }
 
-      await loadData(view === "homeworks" ? "homeworks" : "users");
       setSelectedIds([]);
     } catch (err: any) {
+      // Rollback optimistic updates on error
+      if (view === "homeworks") {
+        setHomeworksCache(originalHomeworksCache);
+      } else {
+        setUsers(originalUsers);
+      }
       setError(err?.message || "Action failed");
     } finally {
       setBulkActionLoading(null);
@@ -515,12 +651,21 @@ export function AdminManagementClient() {
       className="border-b border-foreground/10 hover:bg-foreground/5"
     >
       <td className="whitespace-nowrap px-3 py-3">
-        <input
-          type="checkbox"
-          checked={selectedIds.includes(record.id)}
-          onChange={() => toggleSelection(record.id)}
-          className="size-4"
-        />
+        <div className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            checked={selectedIds.includes(record.id)}
+            onChange={() => toggleSelection(record.id)}
+            className="size-4"
+          />
+          <button
+            type="button"
+            onClick={() => openUserEditor(record)}
+            className="rounded-lg border border-foreground/20 px-2 py-1 text-xs"
+          >
+            Edit
+          </button>
+        </div>
       </td>
       <td className="px-3 py-3 text-sm font-medium text-foreground">
         {record.username}
@@ -584,30 +729,30 @@ export function AdminManagementClient() {
       <header className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setView("homeworks")}
-            className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-              view === "homeworks"
-                ? "bg-foreground text-background"
-                : "bg-foreground/10 text-foreground hover:bg-foreground/20"
-            }`}
-          >
-            Homeworks
-          </button>
-          {!isEmployee && (
             <button
               type="button"
-              onClick={() => setView("users")}
+              onClick={() => setView("homeworks")}
               className={`rounded-full px-4 py-2 text-sm font-medium transition ${
-                view === "users"
+                view === "homeworks"
                   ? "bg-foreground text-background"
                   : "bg-foreground/10 text-foreground hover:bg-foreground/20"
               }`}
             >
-              Users
+              Homeworks
             </button>
-          )}
+            {!isEmployee && (
+              <button
+                type="button"
+                onClick={() => setView("users")}
+                className={`rounded-full px-4 py-2 text-sm font-medium transition ${
+                  view === "users"
+                    ? "bg-foreground text-background"
+                    : "bg-foreground/10 text-foreground hover:bg-foreground/20"
+                }`}
+              >
+                Users
+              </button>
+            )}
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -619,11 +764,54 @@ export function AdminManagementClient() {
           />
           <button
             type="button"
-            onClick={() => void loadData(view)}
+            onClick={() =>
+              view === "homeworks"
+                ? void refreshHomeworkCache()
+                : void loadData(view)
+            }
             className="rounded-lg border border-foreground/20 px-4 py-2 text-sm hover:bg-foreground/10"
           >
             Refresh
           </button>
+          {view === "homeworks" && (
+            <>
+              <select
+                value={sortField}
+                onChange={(e) =>
+                  setSortField(e.target.value as keyof AdminHomeworkRecord)
+                }
+                className="rounded-lg border border-foreground/20 bg-background/70 px-3 py-2 text-sm"
+              >
+                <option value="submittedAt">Sort by Submitted</option>
+                <option value="title">Sort by Title</option>
+                <option value="schoolName">Sort by School</option>
+                <option value="personName">Sort by Owner</option>
+                <option value="status">Sort by Status</option>
+              </select>
+              <button
+                type="button"
+                onClick={() =>
+                  setSortDirection(sortDirection === "asc" ? "desc" : "asc")
+                }
+                className="rounded-lg border border-foreground/20 px-3 py-2 text-sm hover:bg-foreground/10"
+              >
+                {sortDirection === "asc" ? "↑" : "↓"}
+              </button>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="rounded-lg border border-foreground/20 bg-background/70 px-3 py-2 text-sm"
+              >
+                <option value="10">10 per page</option>
+                <option value="20">20 per page</option>
+                <option value="50">50 per page</option>
+                <option value="100">100 per page</option>
+              </select>
+            </>
+          )}
           {view === "homeworks" ? (
             <button
               type="button"
@@ -703,7 +891,14 @@ export function AdminManagementClient() {
           <thead className="bg-foreground/5 text-xs font-semibold uppercase tracking-wide text-foreground/80">
             {view === "homeworks" ? (
               <tr>
-                <th className="px-3 py-3">Select</th>
+                <th className="px-3 py-3">
+                  <input
+                    type="checkbox"
+                    onChange={toggleSelectAll}
+                    checked={(view === "homeworks" ? paginatedRecords : filteredRecords).length > 0 && selectedIds.filter(id => (view === "homeworks" ? paginatedRecords : filteredRecords).some(record => record.id === id)).length === (view === "homeworks" ? paginatedRecords : filteredRecords).length}
+                    className="size-4"
+                  />
+                </th>
                 <th className="px-3 py-3">Title</th>
                 <th className="px-3 py-3">School</th>
                 <th className="px-3 py-3">Owner</th>
@@ -716,7 +911,14 @@ export function AdminManagementClient() {
               </tr>
             ) : (
               <tr>
-                <th className="px-3 py-3">Select</th>
+                <th className="px-3 py-3">
+                  <input
+                    type="checkbox"
+                    onChange={toggleSelectAll}
+                    checked={filteredRecords.length > 0 && selectedIds.filter(id => filteredRecords.some(record => record.id === id)).length === filteredRecords.length}
+                    className="size-4"
+                  />
+                </th>
                 <th className="px-3 py-3">Username</th>
                 <th className="px-3 py-3">Display Name</th>
                 <th className="px-3 py-3">Email</th>
@@ -740,7 +942,8 @@ export function AdminManagementClient() {
                   Loading…
                 </td>
               </tr>
-            ) : filteredRecords.length === 0 ? (
+            ) : (view === "homeworks" ? paginatedRecords : filteredRecords)
+                .length === 0 ? (
               <tr>
                 <td
                   colSpan={view === "homeworks" ? 10 : 10}
@@ -750,7 +953,7 @@ export function AdminManagementClient() {
                 </td>
               </tr>
             ) : view === "homeworks" ? (
-              (filteredRecords as AdminHomeworkRecord[]).map(renderHomeworkRow)
+              (paginatedRecords as AdminHomeworkRecord[]).map(renderHomeworkRow)
             ) : (
               // For users, render the main row and optionally a details row
               (filteredRecords as UserItem[]).flatMap((record) => {
@@ -869,391 +1072,453 @@ export function AdminManagementClient() {
         </table>
       </div>
 
+      {/* Pagination controls for homeworks */}
+      {view === "homeworks" && filteredRecords.length > pageSize && (
+        <div className="flex items-center justify-between rounded-xl border border-foreground/10 bg-white/5 px-4 py-3">
+          <div className="text-sm text-foreground/70">
+            Showing {(currentPage - 1) * pageSize + 1} to{" "}
+            {Math.min(currentPage * pageSize, filteredRecords.length)} of{" "}
+            {filteredRecords.length} results
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCurrentPage(1)}
+              disabled={!hasPrevPage}
+              className="rounded-lg border border-foreground/20 px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              First
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentPage(currentPage - 1)}
+              disabled={!hasPrevPage}
+              className="rounded-lg border border-foreground/20 px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Prev
+            </button>
+            <span className="px-3 py-1 text-sm">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              type="button"
+              onClick={() => setCurrentPage(currentPage + 1)}
+              disabled={!hasNextPage}
+              className="rounded-lg border border-foreground/20 px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Next
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentPage(totalPages)}
+              disabled={!hasNextPage}
+              className="rounded-lg border border-foreground/20 px-3 py-1 text-sm disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Last
+            </button>
+          </div>
+        </div>
+      )}
+
       {!isEmployee && (
         <section className="grid gap-6 lg:grid-cols-2">
           <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6">
             <h2 className="text-lg font-semibold text-foreground">
               Temporary accounts
-          </h2>
-          <p className="mt-1 text-sm text-foreground/60">
-            Quickly generate temporary login credentials.
-          </p>
-          <div className="mt-4 grid gap-3">
-            <label className="text-sm text-foreground/80">
-              Username
-              <input
-                value={tempAccount.username}
-                onChange={(e) =>
-                  setTempAccount((prev) => ({
-                    ...prev,
-                    username: e.target.value,
-                  }))
-                }
-                className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
-              />
-            </label>
-            <label className="text-sm text-foreground/80">
-              Password
-              <input
-                value={tempAccount.password}
-                onChange={(e) =>
-                  setTempAccount((prev) => ({
-                    ...prev,
-                    password: e.target.value,
-                  }))
-                }
-                className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
-                type="password"
-              />
-            </label>
-            <button
-              type="button"
-              onClick={handleCreateTemporary}
-              disabled={creatingTemp}
-              className="mt-2 inline-flex w-fit items-center justify-center rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {creatingTemp ? "Creating…" : "Create temporary account"}
-            </button>
-          </div>
-        </div>
-
-        <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6">
-          <h2 className="text-lg font-semibold text-foreground">
-            Employee invitations
-          </h2>
-          <p className="mt-1 text-sm text-foreground/60">
-            Add employee accounts in bulk by display name, email and password.
-          </p>
-          <div className="mt-4 space-y-3">
-            {employerDrafts.map((draft, index) => (
-              <div key={index} className="grid gap-3 sm:grid-cols-3">
-                <label className="text-sm text-foreground/80">
-                  Display Name
-                  <input
-                    value={draft.display_name}
-                    onChange={(e) => {
-                      const next = [...employerDrafts];
-                      next[index] = {
-                        ...next[index],
-                        display_name: e.target.value,
-                      };
-                      setEmployerDrafts(next);
-                    }}
-                    className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
-                  />
-                </label>
-                <label className="text-sm text-foreground/80">
-                  Email
-                  <input
-                    value={draft.email}
-                    onChange={(e) => {
-                      const next = [...employerDrafts];
-                      const emailVal = e.target.value;
-                      next[index] = {
-                        ...next[index],
-                        email: emailVal,
-                        username: emailVal,
-                      };
-                      setEmployerDrafts(next);
-                    }}
-                    className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
-                    type="email"
-                  />
-                  <div className="mt-1 text-xs text-foreground/60">
-                    Email will be used as the username
-                  </div>
-                </label>
-                <label className="text-sm text-foreground/80">
-                  Password
-                  <input
-                    value={draft.password}
-                    onChange={(e) => {
-                      const next = [...employerDrafts];
-                      next[index] = {
-                        ...next[index],
-                        password: e.target.value,
-                      };
-                      setEmployerDrafts(next);
-                    }}
-                    className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
-                    type="password"
-                  />
-                </label>
-              </div>
-            ))}
-            <div className="flex items-center gap-2">
+            </h2>
+            <p className="mt-1 text-sm text-foreground/60">
+              Quickly generate temporary login credentials.
+            </p>
+            <div className="mt-4 grid gap-3">
+              <label className="text-sm text-foreground/80">
+                Username
+                <input
+                  value={tempAccount.username}
+                  onChange={(e) =>
+                    setTempAccount((prev) => ({
+                      ...prev,
+                      username: e.target.value,
+                    }))
+                  }
+                  className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
+                />
+              </label>
+              <label className="text-sm text-foreground/80">
+                Password
+                <input
+                  value={tempAccount.password}
+                  onChange={(e) =>
+                    setTempAccount((prev) => ({
+                      ...prev,
+                      password: e.target.value,
+                    }))
+                  }
+                  className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
+                  type="password"
+                />
+              </label>
               <button
                 type="button"
-                onClick={() =>
-                  setEmployerDrafts((prev) => [
-                    ...prev,
-                    { display_name: "", email: "", password: "" },
-                  ])
-                }
-                className="rounded-lg border border-foreground/20 px-3 py-1 text-xs font-medium"
+                onClick={handleCreateTemporary}
+                disabled={creatingTemp}
+                className="mt-2 inline-flex w-fit items-center justify-center rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background disabled:cursor-not-allowed disabled:opacity-60"
               >
-                + Add row
+                {creatingTemp ? "Creating…" : "Create temporary account"}
               </button>
-              {employerDrafts.length > 1 ? (
+            </div>
+          </div>
+
+          <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6">
+            <h2 className="text-lg font-semibold text-foreground">
+              Employee invitations
+            </h2>
+            <p className="mt-1 text-sm text-foreground/60">
+              Add employee accounts in bulk by display name, email and password.
+            </p>
+            <div className="mt-4 space-y-3">
+              {employerDrafts.map((draft, index) => (
+                <div key={index} className="grid gap-3 sm:grid-cols-3">
+                  <label className="text-sm text-foreground/80">
+                    Display Name
+                    <input
+                      value={draft.display_name}
+                      onChange={(e) => {
+                        const next = [...employerDrafts];
+                        next[index] = {
+                          ...next[index],
+                          display_name: e.target.value,
+                        };
+                        setEmployerDrafts(next);
+                      }}
+                      className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
+                    />
+                  </label>
+                  <label className="text-sm text-foreground/80">
+                    Email
+                    <input
+                      value={draft.email}
+                      onChange={(e) => {
+                        const next = [...employerDrafts];
+                        const emailVal = e.target.value;
+                        next[index] = {
+                          ...next[index],
+                          email: emailVal,
+                          username: emailVal,
+                        };
+                        setEmployerDrafts(next);
+                      }}
+                      className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
+                      type="email"
+                    />
+                    <div className="mt-1 text-xs text-foreground/60">
+                      Email will be used as the username
+                    </div>
+                  </label>
+                  <label className="text-sm text-foreground/80">
+                    Password
+                    <input
+                      value={draft.password}
+                      onChange={(e) => {
+                        const next = [...employerDrafts];
+                        next[index] = {
+                          ...next[index],
+                          password: e.target.value,
+                        };
+                        setEmployerDrafts(next);
+                      }}
+                      className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
+                      type="password"
+                    />
+                  </label>
+                </div>
+              ))}
+              <div className="flex items-center gap-2">
                 <button
                   type="button"
                   onClick={() =>
-                    setEmployerDrafts((prev) =>
-                      prev.slice(0, Math.max(1, prev.length - 1))
-                    )
+                    setEmployerDrafts((prev) => [
+                      ...prev,
+                      { display_name: "", email: "", password: "" },
+                    ])
                   }
                   className="rounded-lg border border-foreground/20 px-3 py-1 text-xs font-medium"
                 >
-                  Remove last
+                  + Add row
                 </button>
-              ) : null}
+                {employerDrafts.length > 1 ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setEmployerDrafts((prev) =>
+                        prev.slice(0, Math.max(1, prev.length - 1))
+                      )
+                    }
+                    className="rounded-lg border border-foreground/20 px-3 py-1 text-xs font-medium"
+                  >
+                    Remove last
+                  </button>
+                ) : null}
+              </div>
+              <button
+                type="button"
+                onClick={handleCreateEmployers}
+                disabled={
+                  creatingEmployers ||
+                  !employerDrafts.some(
+                    (d) => d.display_name.trim() && d.email.trim() && d.password
+                  )
+                }
+                className="inline-flex w-fit items-center justify-center rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {creatingEmployers ? "Processing…" : "Create employee accounts"}
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={handleCreateEmployers}
-              disabled={
-                creatingEmployers ||
-                !employerDrafts.some(
-                  (d) => d.display_name.trim() && d.email.trim() && d.password
-                )
-              }
-              className="inline-flex w-fit items-center justify-center rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {creatingEmployers ? "Processing…" : "Create employee accounts"}
-            </button>
           </div>
-        </div>
-      </section>
+        </section>
       )}
 
       {!isEmployee && (
         <section className="grid gap-6 lg:grid-cols-2">
-        <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">
-              Temporary accounts
-            </h2>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => void refreshSpecificUsers("temporary")}
-                className="rounded-lg border border-foreground/20 px-3 py-1 text-xs hover:bg-foreground/10"
-              >
-                Refresh
-              </button>
+          <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-foreground">
+                Temporary accounts
+              </h2>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void refreshSpecificUsers("temporary")}
+                  className="rounded-lg border border-foreground/20 px-3 py-1 text-xs hover:bg-foreground/10"
+                >
+                  Refresh
+                </button>
+              </div>
             </div>
-          </div>
-          {temporaryUsers.length === 0 ? (
-            <p className="mt-2 text-sm text-foreground/60">
-              No temporary accounts created yet.
-            </p>
-          ) : (
-            <div className="mt-4 overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead className="text-xs font-semibold text-foreground/80">
-                  <tr>
-                    <th className="px-3 py-2">Username</th>
-                    <th className="px-3 py-2">Role</th>
-                    <th className="px-3 py-2">Created At</th>
-                    <th className="px-3 py-2">State</th>
-                    <th className="px-3 py-2">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {temporaryUsers.map((user) => (
-                    <tr key={user.id} className="border-t border-foreground/10">
-                      <td className="px-3 py-2">{user.username}</td>
-                      <td className="px-3 py-2">
-                        {String(user.role).charAt(0).toUpperCase() +
-                          String(user.role).slice(1)}
-                      </td>
-                      <td className="px-3 py-2">
-                        {user.created_at ? new Date(user.created_at).toLocaleDateString() : "—"}
-                      </td>
-                      <td className="px-3 py-2">
-                        {user.blocked ? "Blocked" : "Active"}
-                      </td>
-                      <td className="px-3 py-2 flex items-center gap-2">
-                        <button
-                          type="button"
-                          disabled={blockingIds.includes(user.id)}
-                          onClick={async () => {
-                            try {
-                              if (!accessToken)
-                                throw new Error("Not authenticated");
-                              setBlockingIds((prev) => [...prev, user.id]);
-                              // toggle block state
-                              await blockAdminUser(
-                                user.id,
-                                !user.blocked,
-                                accessToken
-                              );
-                              await refreshSpecificUsers("temporary");
-                            } catch (err: any) {
-                              setError(err?.message || "Block/Unblock failed");
-                            } finally {
-                              setBlockingIds((prev) =>
-                                prev.filter((id) => id !== user.id)
-                              );
-                            }
-                          }}
-                          className="rounded-lg border border-foreground/20 px-2 py-1 text-xs"
-                        >
-                          {blockingIds.includes(user.id)
-                            ? "Processing..."
-                            : user.blocked
-                            ? "Unblock"
-                            : "Block"}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={blockingIds.includes(user.id)}
-                          onClick={async () => {
-                            if (
-                              !window.confirm(
-                                "Are you sure you want to delete this temporary account?"
-                              )
-                            )
-                              return;
-                            try {
-                              if (!accessToken)
-                                throw new Error("Not authenticated");
-                              setBlockingIds((prev) => [...prev, user.id]);
-                              await deleteAdminUser(user.id, accessToken);
-                              await refreshSpecificUsers("temporary");
-                            } catch (err: any) {
-                              setError(err?.message || "Delete failed");
-                            } finally {
-                              setBlockingIds((prev) =>
-                                prev.filter((id) => id !== user.id)
-                              );
-                            }
-                          }}
-                          className="rounded-lg border border-red-500/20 bg-red-500/10 px-2 py-1 text-xs text-red-600 hover:bg-red-500/20"
-                        >
-                          {blockingIds.includes(user.id)
-                            ? "Processing..."
-                            : "Delete"}
-                        </button>
-                      </td>
+            {temporaryUsers.length === 0 ? (
+              <p className="mt-2 text-sm text-foreground/60">
+                No temporary accounts created yet.
+              </p>
+            ) : (
+              <div className="mt-4 overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="text-xs font-semibold text-foreground/80">
+                    <tr>
+                      <th className="px-3 py-2">Username</th>
+                      <th className="px-3 py-2">Role</th>
+                      <th className="px-3 py-2">Created At</th>
+                      <th className="px-3 py-2">State</th>
+                      <th className="px-3 py-2">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+                  </thead>
+                  <tbody>
+                    {temporaryUsers.map((user) => (
+                      <tr
+                        key={user.id}
+                        className="border-t border-foreground/10"
+                      >
+                        <td className="px-3 py-2">{user.username}</td>
+                        <td className="px-3 py-2">
+                          {String(user.role).charAt(0).toUpperCase() +
+                            String(user.role).slice(1)}
+                        </td>
+                        <td className="px-3 py-2">
+                          {user.created_at
+                            ? new Date(user.created_at).toLocaleDateString()
+                            : "—"}
+                        </td>
+                        <td className="px-3 py-2">
+                          {user.blocked ? "Blocked" : "Active"}
+                        </td>
+                        <td className="px-3 py-2 flex items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={blockingIds.includes(user.id)}
+                            onClick={async () => {
+                              try {
+                                if (!accessToken)
+                                  throw new Error("Not authenticated");
+                                setBlockingIds((prev) => [...prev, user.id]);
+                                // toggle block state
+                                await blockAdminUser(
+                                  user.id,
+                                  !user.blocked,
+                                  accessToken
+                                );
+                                await refreshSpecificUsers("temporary");
+                              } catch (err: any) {
+                                setError(
+                                  err?.message || "Block/Unblock failed"
+                                );
+                              } finally {
+                                setBlockingIds((prev) =>
+                                  prev.filter((id) => id !== user.id)
+                                );
+                              }
+                            }}
+                            className="rounded-lg border border-foreground/20 px-2 py-1 text-xs"
+                          >
+                            {blockingIds.includes(user.id)
+                              ? "Processing..."
+                              : user.blocked
+                              ? "Unblock"
+                              : "Block"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={blockingIds.includes(user.id)}
+                            onClick={async () => {
+                              if (
+                                !window.confirm(
+                                  "Are you sure you want to delete this temporary account?"
+                                )
+                              )
+                                return;
+                              try {
+                                if (!accessToken)
+                                  throw new Error("Not authenticated");
+                                setBlockingIds((prev) => [...prev, user.id]);
+                                await deleteAdminUser(user.id, accessToken);
+                                await refreshSpecificUsers("temporary");
+                              } catch (err: any) {
+                                setError(err?.message || "Delete failed");
+                              } finally {
+                                setBlockingIds((prev) =>
+                                  prev.filter((id) => id !== user.id)
+                                );
+                              }
+                            }}
+                            className="rounded-lg border border-red-500/20 bg-red-500/10 px-2 py-1 text-xs text-red-600 hover:bg-red-500/20"
+                          >
+                            {blockingIds.includes(user.id)
+                              ? "Processing..."
+                              : "Delete"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
 
-        <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-foreground">
-              Employee accounts
-            </h2>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => void refreshSpecificUsers("employee")}
-                className="rounded-lg border border-foreground/20 px-3 py-1 text-xs hover:bg-foreground/10"
-              >
-                Refresh
-              </button>
+          <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6">
+            <div className="flex items-center justify-between">
+              <h2 className="text-lg font-semibold text-foreground">
+                Employee accounts
+              </h2>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => void refreshSpecificUsers("employee")}
+                  className="rounded-lg border border-foreground/20 px-3 py-1 text-xs hover:bg-foreground/10"
+                >
+                  Refresh
+                </button>
+              </div>
             </div>
-          </div>
-          {employerUsers.length === 0 ? (
-            <p className="mt-2 text-sm text-foreground/60">
-              No employee accounts found.
-            </p>
-          ) : (
-            <div className="mt-4 overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead className="text-xs font-semibold text-foreground/80">
-                  <tr>
-                    <th className="px-3 py-2">Username</th>
-                    <th className="px-3 py-2">Display name</th>
-                    <th className="px-3 py-2">Email</th>
-                    <th className="px-3 py-2">Status</th>
-                    <th className="px-3 py-2">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {employerUsers.map((user) => (
-                    <tr key={user.id} className="border-t border-foreground/10">
-                      <td className="px-3 py-2">{user.username}</td>
-                      <td className="px-3 py-2">{user.display_name || "—"}</td>
-                      <td className="px-3 py-2">{user.email || "—"}</td>
-                      <td className="px-3 py-2">
-                        {user.blocked ? "Blocked" : "Active"}
-                      </td>
-                      <td className="px-3 py-2 flex items-center gap-2">
-                        <button
-                          type="button"
-                          disabled={blockingIds.includes(user.id)}
-                          onClick={async () => {
-                            try {
-                              if (!accessToken)
-                                throw new Error("Not authenticated");
-                              setBlockingIds((prev) => [...prev, user.id]);
-                              await blockAdminUser(
-                                user.id,
-                                !user.blocked,
-                                accessToken
-                              );
-                              await refreshSpecificUsers("employee");
-                            } catch (err: any) {
-                              setError(err?.message || "Block/Unblock failed");
-                            } finally {
-                              setBlockingIds((prev) =>
-                                prev.filter((id) => id !== user.id)
-                              );
-                            }
-                          }}
-                          className="rounded-lg border border-foreground/20 px-2 py-1 text-xs"
-                        >
-                          {blockingIds.includes(user.id)
-                            ? "Processing..."
-                            : user.blocked
-                            ? "Unblock"
-                            : "Block"}
-                        </button>
-                        <button
-                          type="button"
-                          disabled={blockingIds.includes(user.id)}
-                          onClick={async () => {
-                            if (
-                              !window.confirm(
-                                "Are you sure you want to delete this employee account?"
-                              )
-                            )
-                              return;
-                            try {
-                              if (!accessToken)
-                                throw new Error("Not authenticated");
-                              setBlockingIds((prev) => [...prev, user.id]);
-                              await deleteAdminUser(user.id, accessToken);
-                              await refreshSpecificUsers("employee");
-                            } catch (err: any) {
-                              setError(err?.message || "Delete failed");
-                            } finally {
-                              setBlockingIds((prev) =>
-                                prev.filter((id) => id !== user.id)
-                              );
-                            }
-                          }}
-                          className="rounded-lg border border-red-500/20 bg-red-500/10 px-2 py-1 text-xs text-red-600 hover:bg-red-500/20"
-                        >
-                          {blockingIds.includes(user.id)
-                            ? "Processing..."
-                            : "Delete"}
-                        </button>
-                      </td>
+            {employerUsers.length === 0 ? (
+              <p className="mt-2 text-sm text-foreground/60">
+                No employee accounts found.
+              </p>
+            ) : (
+              <div className="mt-4 overflow-x-auto">
+                <table className="min-w-full text-left text-sm">
+                  <thead className="text-xs font-semibold text-foreground/80">
+                    <tr>
+                      <th className="px-3 py-2">Username</th>
+                      <th className="px-3 py-2">Display name</th>
+                      <th className="px-3 py-2">Email</th>
+                      <th className="px-3 py-2">Status</th>
+                      <th className="px-3 py-2">Actions</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </section>
+                  </thead>
+                  <tbody>
+                    {employerUsers.map((user) => (
+                      <tr
+                        key={user.id}
+                        className="border-t border-foreground/10"
+                      >
+                        <td className="px-3 py-2">{user.username}</td>
+                        <td className="px-3 py-2">
+                          {user.display_name || "—"}
+                        </td>
+                        <td className="px-3 py-2">{user.email || "—"}</td>
+                        <td className="px-3 py-2">
+                          {user.blocked ? "Blocked" : "Active"}
+                        </td>
+                        <td className="px-3 py-2 flex items-center gap-2">
+                          <button
+                            type="button"
+                            disabled={blockingIds.includes(user.id)}
+                            onClick={async () => {
+                              try {
+                                if (!accessToken)
+                                  throw new Error("Not authenticated");
+                                setBlockingIds((prev) => [...prev, user.id]);
+                                await blockAdminUser(
+                                  user.id,
+                                  !user.blocked,
+                                  accessToken
+                                );
+                                await refreshSpecificUsers("employee");
+                              } catch (err: any) {
+                                setError(
+                                  err?.message || "Block/Unblock failed"
+                                );
+                              } finally {
+                                setBlockingIds((prev) =>
+                                  prev.filter((id) => id !== user.id)
+                                );
+                              }
+                            }}
+                            className="rounded-lg border border-foreground/20 px-2 py-1 text-xs"
+                          >
+                            {blockingIds.includes(user.id)
+                              ? "Processing..."
+                              : user.blocked
+                              ? "Unblock"
+                              : "Block"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={blockingIds.includes(user.id)}
+                            onClick={async () => {
+                              if (
+                                !window.confirm(
+                                  "Are you sure you want to delete this employee account?"
+                                )
+                              )
+                                return;
+                              try {
+                                if (!accessToken)
+                                  throw new Error("Not authenticated");
+                                setBlockingIds((prev) => [...prev, user.id]);
+                                await deleteAdminUser(user.id, accessToken);
+                                await refreshSpecificUsers("employee");
+                              } catch (err: any) {
+                                setError(err?.message || "Delete failed");
+                              } finally {
+                                setBlockingIds((prev) =>
+                                  prev.filter((id) => id !== user.id)
+                                );
+                              }
+                            }}
+                            className="rounded-lg border border-red-500/20 bg-red-500/10 px-2 py-1 text-xs text-red-600 hover:bg-red-500/20"
+                          >
+                            {blockingIds.includes(user.id)
+                              ? "Processing..."
+                              : "Delete"}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </section>
       )}
 
       {editing ? (

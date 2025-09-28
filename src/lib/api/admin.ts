@@ -95,6 +95,18 @@ export async function fetchAdminHomeworks(
   } satisfies PaginatedResult<AdminHomeworkRecord>;
 }
 
+export async function fetchAllAdminHomeworks(token: string) {
+  const res = await send<{ items: AdminHomeworkRecord[]; total: number; limit: number }>(
+    `/api/homeworks/admin/all`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    }
+  );
+  return res;
+}
+
 export async function fetchAdminUsers(
   params: Record<string, string | number | undefined> = {},
   token?: string
