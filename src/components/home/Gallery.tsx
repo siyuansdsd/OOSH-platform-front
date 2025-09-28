@@ -381,28 +381,38 @@ export function Gallery({
     }
 
     if (videoCount > 0) {
-      // On mobile, show static video poster to avoid touch conflicts
+      // On mobile, keep the first frame as cover with a faux play indicator
       if (isMobile) {
         return (
           <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-black">
             <video
-              className="h-full w-full object-cover"
+              ref={videoRef}
+              className="h-full w-full object-cover pointer-events-none"
               src={item.videos[0]}
               muted
               playsInline
               preload="metadata"
               controls={false}
-              autoPlay
-              loop
+              onLoadedData={() => {
+                const video = videoRef.current;
+                if (!video) return;
+                try {
+                  if (video.readyState >= 2) {
+                    video.currentTime = Math.max(video.currentTime, 0.08);
+                  }
+                  video.pause();
+                } catch {
+                  /* ignore */
+                }
+              }}
             >
               Your browser does not support the video tag.
             </video>
-            {/* Play icon overlay for mobile */}
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="rounded-full bg-black/60 p-3">
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <div className="flex size-12 items-center justify-center rounded-full bg-black/60 text-white shadow-lg">
                 <svg
-                  width="24"
-                  height="24"
+                  width="20"
+                  height="20"
                   viewBox="0 0 24 24"
                   fill="white"
                   className="ml-1"
