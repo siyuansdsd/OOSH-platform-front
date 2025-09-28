@@ -272,6 +272,7 @@ export function Gallery({
     const imageCount = item.images.length;
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [videoActive, setVideoActive] = useState(false);
 
     // Detect mobile devices and tablets (including iPad)
     const isMobile = useMemo(() => {
@@ -292,6 +293,29 @@ export function Gallery({
 
       return mobileUserAgent || isIPad || hasTouchSupport;
     }, []);
+
+    const fallbackPoster =
+      "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0nMTAwJyBoZWlnaHQ9JzEwMCcgZmlsbD0nI0Y5RkY4MicgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJz48cmVjdCBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4zIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjE2Ii8+PHBhdGggZD0nTTQwIDM0LjA3OGMwLTQuMDIgMy42MjUtNi42NTYgNy4xMTYtNS4wNjRsMjQuOCAxMS4yNDJjMy44MDIgMS43MjIgMy44MDIgNi41NjUgMCA4LjI4N2wtMjQuOCAxMS4yNDFjLTMuNDkxIDEuNTkzLTcuMTE2LTMuMDQzLTcuMTE2LTcuMDY1VjM0LjA3OHonIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjciLz48L3N2Zz4=";
+
+    const coverSrc = useMemo(() => {
+      const videoUrl = item.videos[0];
+      if (videoUrl) {
+        try {
+          const parsed = new URL(videoUrl);
+          const segments = parsed.pathname.split("/");
+          const filename = segments.pop() || "";
+          const dotIndex = filename.lastIndexOf(".");
+          const namePart = dotIndex === -1 ? filename : filename.slice(0, dotIndex);
+          segments.push(`${namePart || "video"}.png`);
+          parsed.pathname = segments.join("/");
+          return parsed.toString();
+        } catch {
+          const replaced = videoUrl.replace(/\.[^./?]+(?=($|\?))/, ".png");
+          return replaced === videoUrl ? `${videoUrl}.png` : replaced;
+        }
+      }
+      return item.images[0] || fallbackPoster;
+    }, [item.videos, item.images]);
 
     const badges: Array<{ label: string; variant: "video" | "image" }> = [];
     if (videoCount > 0) {
@@ -335,20 +359,33 @@ export function Gallery({
           videoEl.currentTime = 0;
         } catch {}
       }
+      setVideoActive(false);
     };
 
     const schedulePlay = () => {
-      if (videoCount === 0) return;
+      if (videoCount === 0 || isMobile) return;
       clearTimer();
       hoverTimer.current = setTimeout(() => {
         const videoEl = videoRef.current;
         if (videoEl) {
-          videoEl.play().catch(() => {});
+          const playPromise = videoEl.play();
+          if (playPromise && typeof playPromise.then === "function") {
+            playPromise
+              .then(() => {
+                setVideoActive(true);
+              })
+              .catch(() => {});
+          } else {
+            setVideoActive(true);
+          }
         }
       }, 900);
     };
 
     useEffect(() => () => stopVideo(), []);
+    useEffect(() => {
+      stopVideo();
+    }, [item.id]);
 
     if (imageCount > 0) {
       return (
@@ -382,26 +419,6 @@ export function Gallery({
 
     if (videoCount > 0) {
       if (isMobile) {
-        const coverSrc = (() => {
-          const url = item.videos[0];
-          if (!url) return "";
-          try {
-            const parsed = new URL(url);
-            const parts = parsed.pathname.split("/");
-            const last = parts.pop() || "";
-            if (last.includes(".")) {
-              const [name] = last.split(".");
-              parts.push(`${name}.png`);
-            } else {
-              parts.push(`${last}.png`);
-            }
-            parsed.pathname = parts.join("/");
-            return parsed.toString();
-          } catch {
-            return url.replace(/\.[^./?]+(?=($|\?))/, ".png");
-          }
-        })();
-
         return (
           <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-black">
             <img
@@ -448,19 +465,36 @@ export function Gallery({
           onMouseEnter={schedulePlay}
           onMouseLeave={stopVideo}
         >
+          <img
+            src={coverSrc}
+            alt={item.title || item.groupName || item.personName || "Video cover"}
+            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
+              videoActive ? "opacity-0" : "opacity-100"
+            }`}
+          />
           <video
             ref={videoRef}
-            className="h-full w-full object-cover pointer-events-none"
+            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 pointer-events-none ${
+              videoActive ? "opacity-100" : "opacity-0"
+            }`}
             src={item.videos[0]}
             muted
             loop
             playsInline
             preload="metadata"
             controls={false}
-            autoPlay
           >
             Your browser does not support the video tag.
           </video>
+          {!videoActive ? (
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <div className="flex size-12 items-center justify-center rounded-full bg-black/60 text-white shadow-lg">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="white" className="ml-1">
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </div>
+            </div>
+          ) : null}
           {badges.length > 0 ? (
             <div className="pointer-events-none absolute right-3 top-3 flex w-32 flex-col items-end gap-1 text-xs font-semibold text-white">
               {badges.map((badge) => (
