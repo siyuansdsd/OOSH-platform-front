@@ -381,30 +381,18 @@ export function Gallery({
     }
 
     if (videoCount > 0) {
-      // On mobile, keep the first frame as cover with a faux play indicator
       if (isMobile) {
         return (
           <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-black">
             <video
-              ref={videoRef}
-              className="h-full w-full object-cover pointer-events-none"
+              className="h-full w-full object-cover"
               src={item.videos[0]}
               muted
               playsInline
               preload="metadata"
               controls={false}
-              onLoadedData={() => {
-                const video = videoRef.current;
-                if (!video) return;
-                try {
-                  if (video.readyState >= 2) {
-                    video.currentTime = Math.max(video.currentTime, 0.08);
-                  }
-                  video.pause();
-                } catch {
-                  /* ignore */
-                }
-              }}
+              autoPlay
+              loop
             >
               Your browser does not support the video tag.
             </video>
