@@ -142,6 +142,36 @@ export function Gallery({
   const touchCurrentRef = useRef<number | null>(null);
 
   const gridItems = useMemo(() => items ?? [], [items]);
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+  const isMobileView = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    const hasTouch = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+    const uaMobile = /Android|webOS|iPhone|iPad|iPod/i.test(
+      navigator.userAgent
+    );
+    return hasTouch || uaMobile;
+  }, []);
+
+  // IntersectionObserver for mobile sentinel
+  useEffect(() => {
+    if (!isMobileView) return;
+    const node = sentinelRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting && onLoadMore) {
+            // Only trigger if HomePageClient's hasMore allows it; onLoadMore should internally guard
+            onLoadMore();
+          }
+        });
+      },
+      { root: null, rootMargin: "0px", threshold: 0.1 }
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [isMobileView, onLoadMore]);
 
   const modalTitle = modalItem
     ? modalItem.title ||
@@ -498,18 +528,49 @@ export function Gallery({
         ) : null}
       </div>
 
-      {(rawHasMore !== null && rawHasMore) ||
-      (rawTotal !== null && rawTotal > gridItems.length) ||
-      hasMore ? (
-        <button
-          type="button"
-          onClick={onLoadMore}
-          disabled={loading || loadingMore}
-          className="mx-auto inline-flex min-h-[2.75rem] min-w-[10rem] items-center justify-center rounded-full border border-foreground/20 bg-white/80 px-6 text-sm font-medium text-foreground shadow-sm transition hover:border-foreground/40 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {loadingMore ? "Loading…" : "Load more"}
-        </button>
-      ) : null}
+      {(() => {
+        const showLoadMore =
+          (rawHasMore !== null && rawHasMore) ||
+          (rawTotal !== null && rawTotal > gridItems.length) ||
+          Boolean(hasMore);
+        const canTrigger = !loadingMore && Boolean(hasMore);
+        if (!showLoadMore) return null;
+
+        if (isMobileView) {
+          return (
+            <div className="flex flex-col items-center gap-2">
+              <div ref={sentinelRef} className="w-full h-2" />
+              {canTrigger ? (
+                <div className="text-sm text-foreground/80">
+                  Pull up to load more
+                </div>
+              ) : (
+                <div className="text-sm text-foreground/50">
+                  You've reached the end of the available results.
+                </div>
+              )}
+            </div>
+          );
+        }
+
+        return (
+          <div className="flex flex-col items-center gap-2">
+            <button
+              type="button"
+              onClick={onLoadMore}
+              disabled={loading || loadingMore || !hasMore}
+              className="mx-auto inline-flex min-h-[2.75rem] min-w-[10rem] items-center justify-center rounded-full border border-foreground/20 bg-white/80 px-6 text-sm font-medium text-foreground shadow-sm transition hover:border-foreground/40 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {loadingMore ? "Loading…" : "Load more"}
+            </button>
+            {!canTrigger ? (
+              <div className="text-sm text-foreground/50">
+                You've reached the end of the available results.
+              </div>
+            ) : null}
+          </div>
+        );
+      })()}
 
       {modalItem ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4 py-8 sm:px-6">
