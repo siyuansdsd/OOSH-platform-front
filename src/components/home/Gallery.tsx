@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { TouchEvent } from "react";
 import type { HomeworkRecord } from "@/lib/api/homeworks";
 import Spinner from "@/components/ui/Spinner";
+import VideoSnapshot from "video-snapshot";
 
 interface GalleryProps {
   items: HomeworkRecord[];
@@ -272,6 +273,29 @@ export function Gallery({
     const imageCount = item.images.length;
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const [poster, setPoster] = useState<string | null>(null);
+
+    useEffect(() => {
+      setPoster(null);
+    }, [item.id]);
+
+    useEffect(() => {
+      let cancelled = false;
+      async function generatePoster() {
+        if (!item.videos[0] || poster) return;
+        try {
+          const snapshot = new VideoSnapshot(item.videos[0]);
+          const image = await snapshot.takeSnapshot();
+          if (!cancelled && image) setPoster(image);
+        } catch (error) {
+          console.error("Failed to create video poster", error);
+        }
+      }
+      void generatePoster();
+      return () => {
+        cancelled = true;
+      };
+    }, [item.videos, poster]);
 
     // Detect mobile devices and tablets (including iPad)
     const isMobile = useMemo(() => {
@@ -381,7 +405,7 @@ export function Gallery({
     }
 
     if (videoCount > 0) {
-      const VideoShell = (
+      const videoElement = (
         <video
           ref={videoRef}
           className="h-full w-full object-cover pointer-events-none"
@@ -391,48 +415,11 @@ export function Gallery({
           playsInline
           preload="metadata"
           controls={false}
-          autoPlay
+          poster={poster ?? undefined}
         >
           Your browser does not support the video tag.
         </video>
       );
-
-      if (isMobile) {
-        return (
-          <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-black">
-            {VideoShell}
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="flex size-12 items-center justify-center rounded-full bg-black/60 text-white shadow-lg">
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="white"
-                  className="ml-1"
-                >
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              </div>
-            </div>
-            {badges.length > 0 ? (
-              <div className="pointer-events-none absolute right-3 top-3 flex w-32 flex-col items-end gap-1 text-xs font-semibold text-white">
-                {badges.map((badge) => (
-                  <span
-                    key={badge.label}
-                    className={`inline-flex w-full justify-center rounded-full px-3 py-1 ${
-                      badge.variant === "video"
-                        ? "bg-sky-500/80"
-                        : "bg-orange-500/80"
-                    }`}
-                  >
-                    {badge.label}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        );
-      }
 
       return (
         <div
@@ -440,7 +427,14 @@ export function Gallery({
           onMouseEnter={schedulePlay}
           onMouseLeave={stopVideo}
         >
-          {VideoShell}
+          {videoElement}
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div className="flex size-12 items-center justify-center rounded-full bg-black/60 text-white shadow-lg">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="white" className="ml-1">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </div>
+          </div>
           {badges.length > 0 ? (
             <div className="pointer-events-none absolute right-3 top-3 flex w-32 flex-col items-end gap-1 text-xs font-semibold text-white">
               {badges.map((badge) => (

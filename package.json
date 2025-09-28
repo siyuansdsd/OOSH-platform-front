@@ -15,7 +15,8 @@
     "dompurify": "^3.2.7",
     "next": "15.5.2",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "video-snapshot": "^1.0.11"
   },
   "devDependencies": {
     "@biomejs/biome": "2.2.0",
