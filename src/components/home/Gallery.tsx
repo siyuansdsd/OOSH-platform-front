@@ -392,7 +392,8 @@ export function Gallery({
               playsInline
               preload="metadata"
               controls={false}
-              poster=""
+              autoPlay
+              loop
             >
               Your browser does not support the video tag.
             </video>
@@ -446,6 +447,7 @@ export function Gallery({
             playsInline
             preload="metadata"
             controls={false}
+            autoPlay
           >
             Your browser does not support the video tag.
           </video>
