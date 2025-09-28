@@ -381,21 +381,26 @@ export function Gallery({
     }
 
     if (videoCount > 0) {
+      const VideoShell = (
+        <video
+          ref={videoRef}
+          className="h-full w-full object-cover pointer-events-none"
+          src={item.videos[0]}
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          controls={false}
+          autoPlay
+        >
+          Your browser does not support the video tag.
+        </video>
+      );
+
       if (isMobile) {
         return (
           <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-black">
-            <video
-              className="h-full w-full object-cover"
-              src={item.videos[0]}
-              muted
-              playsInline
-              preload="metadata"
-              controls={false}
-              autoPlay
-              loop
-            >
-              Your browser does not support the video tag.
-            </video>
+            {VideoShell}
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
               <div className="flex size-12 items-center justify-center rounded-full bg-black/60 text-white shadow-lg">
                 <svg
@@ -429,26 +434,13 @@ export function Gallery({
         );
       }
 
-      // Desktop version with hover to play
       return (
         <div
           className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-black"
           onMouseEnter={schedulePlay}
           onMouseLeave={stopVideo}
         >
-          <video
-            ref={videoRef}
-            className="h-full w-full object-cover"
-            src={item.videos[0]}
-            muted
-            loop
-            playsInline
-            preload="metadata"
-            controls={false}
-            autoPlay
-          >
-            Your browser does not support the video tag.
-          </video>
+          {VideoShell}
           {badges.length > 0 ? (
             <div className="pointer-events-none absolute right-3 top-3 flex w-32 flex-col items-end gap-1 text-xs font-semibold text-white">
               {badges.map((badge) => (
