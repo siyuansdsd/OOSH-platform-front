@@ -271,62 +271,44 @@ export function Gallery({
   const CardMedia = ({ item }: { item: HomeworkRecord }) => {
     const videoCount = item.videos.length;
     const imageCount = item.images.length;
-    const videoRef = useRef<HTMLVideoElement | null>(null);
-    const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [poster, setPoster] = useState<string | null>(null);
-    const posterGeneratingRef = useRef(false);
+    const posterAbortRef = useRef<AbortController | null>(null);
 
     useEffect(() => {
       setPoster(null);
-      posterGeneratingRef.current = false;
-    }, [item.id]);
+      posterAbortRef.current?.abort();
+      posterAbortRef.current = null;
 
-    useEffect(() => {
-      let cancelled = false;
+      if (!item.videos[0]) return;
+      const controller = new AbortController();
+      posterAbortRef.current = controller;
+
       async function generatePoster() {
-        if (!item.videos[0] || poster || posterGeneratingRef.current) return;
-        posterGeneratingRef.current = true;
         try {
-          const controller = new AbortController();
-          const res = await fetch(item.videos[0], {
+          const response = await fetch(item.videos[0], {
             mode: "cors",
             signal: controller.signal,
           });
-          const blob = await res.blob();
-          if (cancelled) return;
+          if (!response.ok) throw new Error(`HTTP ${response.status}`);
+          const blob = await response.blob();
+          if (controller.signal.aborted) return;
           const snapshot = new VideoSnapshot(blob);
           const image = await snapshot.takeSnapshot();
-          if (!cancelled && image) setPoster(image);
+          if (!controller.signal.aborted && image) setPoster(image);
         } catch (error) {
-          console.error("Failed to create video poster", error);
+          if (!controller.signal.aborted) {
+            console.error("Failed generating video poster", error);
+          }
         }
-        posterGeneratingRef.current = false;
       }
+
       void generatePoster();
+
       return () => {
-        cancelled = true;
+        controller.abort();
+        posterAbortRef.current = null;
       };
-    }, [item.videos, poster]);
-
-    // Detect mobile devices and tablets (including iPad)
-    const isMobile = useMemo(() => {
-      if (typeof window === "undefined") return false;
-
-      // Check for touch capability
-      const hasTouchSupport =
-        "ontouchstart" in window || navigator.maxTouchPoints > 0;
-
-      // Traditional mobile/tablet user agents
-      const mobileUserAgent =
-        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
-          navigator.userAgent
-        );
-
-      // Modern iPad detection (iPadOS 13+ reports as desktop Safari)
-      const isIPad = /Macintosh/i.test(navigator.userAgent) && hasTouchSupport;
-
-      return mobileUserAgent || isIPad || hasTouchSupport;
-    }, []);
+    }, [item.id, item.videos]);
 
     const badges: Array<{ label: string; variant: "video" | "image" }> = [];
     if (videoCount > 0) {
@@ -353,37 +335,6 @@ export function Gallery({
         variant: "image",
       });
     }
-
-    const clearTimer = () => {
-      if (hoverTimer.current) {
-        clearTimeout(hoverTimer.current);
-        hoverTimer.current = null;
-      }
-    };
-
-    const stopVideo = () => {
-      clearTimer();
-      const videoEl = videoRef.current;
-      if (videoEl) {
-        videoEl.pause();
-        try {
-          videoEl.currentTime = 0;
-        } catch {}
-      }
-    };
-
-    const schedulePlay = () => {
-      if (videoCount === 0) return;
-      clearTimer();
-      hoverTimer.current = setTimeout(() => {
-        const videoEl = videoRef.current;
-        if (videoEl) {
-          videoEl.play().catch(() => {});
-        }
-      }, 900);
-    };
-
-    useEffect(() => () => stopVideo(), []);
 
     if (imageCount > 0) {
       return (
@@ -416,29 +367,16 @@ export function Gallery({
     }
 
     if (videoCount > 0) {
-      const videoElement = (
-        <video
-          ref={videoRef}
-          className="h-full w-full object-cover pointer-events-none"
-          src={item.videos[0]}
-          muted
-          loop
-          playsInline
-          preload="metadata"
-          controls={false}
-          poster={poster ?? undefined}
-        >
-          Your browser does not support the video tag.
-        </video>
-      );
-
+      const fallbackPoster =
+        "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0nMTAwJyBoZWlnaHQ9JzEwMCcgZmlsbD0nI0Y5RkY4MicgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJz48cmVjdCBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4zIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjE2Ii8+PHBhdGggZD0nTTQwIDM0LjA3OGMwLTQuMDIgMy42MjUtNi42NTYgNy4xMTYtNS4wNjRsMjQuOCAxMS4yNDJjMy44MDIgMS43MjIgMy44MDIgNi41NjUgMCA4LjI4N2wtMjQuOCAxMS4yNDFjLTMuNDkxIDEuNTkzLTcuMTE2LTMuMDQzLTcuMTE2LTcuMDY1VjM0LjA3OHonIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjciLz48L3N2Zz4=";
+      const coverSrc = poster || item.images[0] || fallbackPoster;
       return (
-        <div
-          className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-black"
-          onMouseEnter={schedulePlay}
-          onMouseLeave={stopVideo}
-        >
-          {videoElement}
+        <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-black">
+          <img
+            src={coverSrc}
+            alt={item.title || item.groupName || item.personName || "Video cover"}
+            className="h-full w-full object-cover"
+          />
           <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
             <div className="flex size-12 items-center justify-center rounded-full bg-black/60 text-white shadow-lg">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="white" className="ml-1">
