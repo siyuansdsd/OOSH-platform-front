@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { TouchEvent } from "react";
 import type { HomeworkRecord } from "@/lib/api/homeworks";
 import Spinner from "@/components/ui/Spinner";
-import VideoSnapshot from "video-snapshot";
 
 interface GalleryProps {
   items: HomeworkRecord[];
@@ -271,48 +270,28 @@ export function Gallery({
   const CardMedia = ({ item }: { item: HomeworkRecord }) => {
     const videoCount = item.videos.length;
     const imageCount = item.images.length;
-    const [poster, setPoster] = useState<string | null>(null);
-    const posterAbortRef = useRef<AbortController | null>(null);
+    const videoRef = useRef<HTMLVideoElement | null>(null);
+    const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    useEffect(() => {
-      setPoster(null);
-      posterAbortRef.current?.abort();
-      posterAbortRef.current = null;
+    // Detect mobile devices and tablets (including iPad)
+    const isMobile = useMemo(() => {
+      if (typeof window === "undefined") return false;
 
-      if (!item.videos[0]) return;
-      const controller = new AbortController();
-      posterAbortRef.current = controller;
+      // Check for touch capability
+      const hasTouchSupport =
+        "ontouchstart" in window || navigator.maxTouchPoints > 0;
 
-      async function generatePoster() {
-        try {
-          const response = await fetch(item.videos[0], {
-            mode: "cors",
-            signal: controller.signal,
-          });
-          if (!response.ok) throw new Error(`HTTP ${response.status}`);
-          const blob = await response.blob();
-          if (controller.signal.aborted) return;
-          const snapshot = new VideoSnapshot(blob);
-          try {
-            const image = await snapshot.takeSnapshot(0.6);
-            if (!controller.signal.aborted && image) setPoster(image);
-          } finally {
-            snapshot.end();
-          }
-        } catch (error) {
-          if (!controller.signal.aborted) {
-            console.error("Failed generating video poster", error);
-          }
-        }
-      }
+      // Traditional mobile/tablet user agents
+      const mobileUserAgent =
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+          navigator.userAgent
+        );
 
-      void generatePoster();
+      // Modern iPad detection (iPadOS 13+ reports as desktop Safari)
+      const isIPad = /Macintosh/i.test(navigator.userAgent) && hasTouchSupport;
 
-      return () => {
-        controller.abort();
-        posterAbortRef.current = null;
-      };
-    }, [item.id, item.videos]);
+      return mobileUserAgent || isIPad || hasTouchSupport;
+    }, []);
 
     const badges: Array<{ label: string; variant: "video" | "image" }> = [];
     if (videoCount > 0) {
@@ -339,6 +318,37 @@ export function Gallery({
         variant: "image",
       });
     }
+
+    const clearTimer = () => {
+      if (hoverTimer.current) {
+        clearTimeout(hoverTimer.current);
+        hoverTimer.current = null;
+      }
+    };
+
+    const stopVideo = () => {
+      clearTimer();
+      const videoEl = videoRef.current;
+      if (videoEl) {
+        videoEl.pause();
+        try {
+          videoEl.currentTime = 0;
+        } catch {}
+      }
+    };
+
+    const schedulePlay = () => {
+      if (videoCount === 0) return;
+      clearTimer();
+      hoverTimer.current = setTimeout(() => {
+        const videoEl = videoRef.current;
+        if (videoEl) {
+          videoEl.play().catch(() => {});
+        }
+      }, 900);
+    };
+
+    useEffect(() => () => stopVideo(), []);
 
     if (imageCount > 0) {
       return (
@@ -371,23 +381,66 @@ export function Gallery({
     }
 
     if (videoCount > 0) {
-      const fallbackPoster =
-        "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0nMTAwJyBoZWlnaHQ9JzEwMCcgZmlsbD0nI0Y5RkY4MicgeG1sbnM9J2h0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnJz48cmVjdCBmaWxsPSIjMDAwIiBmaWxsLW9wYWNpdHk9Ii4zIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcng9IjE2Ii8+PHBhdGggZD0nTTQwIDM0LjA3OGMwLTQuMDIgMy42MjUtNi42NTYgNy4xMTYtNS4wNjRsMjQuOCAxMS4yNDJjMy44MDIgMS43MjIgMy44MDIgNi41NjUgMCA4LjI4N2wtMjQuOCAxMS4yNDFjLTMuNDkxIDEuNTkzLTcuMTE2LTMuMDQzLTcuMTE2LTcuMDY1VjM0LjA3OHonIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iLjciLz48L3N2Zz4=";
-      const coverSrc = poster || item.images[0] || fallbackPoster;
-      return (
-        <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-black">
-          <img
-            src={coverSrc}
-            alt={item.title || item.groupName || item.personName || "Video cover"}
-            className="h-full w-full object-cover"
-          />
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div className="flex size-12 items-center justify-center rounded-full bg-black/60 text-white shadow-lg">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="white" className="ml-1">
-                <path d="M8 5v14l11-7z" />
-              </svg>
+      const VideoShell = (
+        <video
+          ref={videoRef}
+          className="h-full w-full object-cover pointer-events-none"
+          src={item.videos[0]}
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          controls={false}
+          autoPlay
+        >
+          Your browser does not support the video tag.
+        </video>
+      );
+
+      if (isMobile) {
+        return (
+          <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-black">
+            {VideoShell}
+            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+              <div className="flex size-12 items-center justify-center rounded-full bg-black/60 text-white shadow-lg">
+                <svg
+                  width="20"
+                  height="20"
+                  viewBox="0 0 24 24"
+                  fill="white"
+                  className="ml-1"
+                >
+                  <path d="M8 5v14l11-7z" />
+                </svg>
+              </div>
             </div>
+            {badges.length > 0 ? (
+              <div className="pointer-events-none absolute right-3 top-3 flex w-32 flex-col items-end gap-1 text-xs font-semibold text-white">
+                {badges.map((badge) => (
+                  <span
+                    key={badge.label}
+                    className={`inline-flex w-full justify-center rounded-full px-3 py-1 ${
+                      badge.variant === "video"
+                        ? "bg-sky-500/80"
+                        : "bg-orange-500/80"
+                    }`}
+                  >
+                    {badge.label}
+                  </span>
+                ))}
+              </div>
+            ) : null}
           </div>
+        );
+      }
+
+      return (
+        <div
+          className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-black"
+          onMouseEnter={schedulePlay}
+          onMouseLeave={stopVideo}
+        >
+          {VideoShell}
           {badges.length > 0 ? (
             <div className="pointer-events-none absolute right-3 top-3 flex w-32 flex-col items-end gap-1 text-xs font-semibold text-white">
               {badges.map((badge) => (
