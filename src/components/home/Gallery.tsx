@@ -293,8 +293,12 @@ export function Gallery({
           const blob = await response.blob();
           if (controller.signal.aborted) return;
           const snapshot = new VideoSnapshot(blob);
-          const image = await snapshot.takeSnapshot();
-          if (!controller.signal.aborted && image) setPoster(image);
+          try {
+            const image = await snapshot.takeSnapshot(0.6);
+            if (!controller.signal.aborted && image) setPoster(image);
+          } finally {
+            snapshot.end();
+          }
         } catch (error) {
           if (!controller.signal.aborted) {
             console.error("Failed generating video poster", error);
