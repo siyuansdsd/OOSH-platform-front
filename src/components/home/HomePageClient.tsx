@@ -4,20 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { Gallery } from "@/components/home/Gallery";
 import { SearchBar } from "@/components/home/SearchBar";
-import { TypeFilter } from "@/components/home/TypeFilter";
 import { APPROVED_SCHOOLS } from "@/constants/schools";
 import {
   fetchHomeworks,
-  fetchHomeworksWithUrls,
-  type HomeworkCategory,
   type HomeworkListParams,
   type HomeworkRecord,
 } from "@/lib/api/homeworks";
 
 const PAGE_SIZE = 12;
-
-type FilterValue = "all" | HomeworkCategory;
-const DEFAULT_TYPE: FilterValue = "media";
 
 interface CacheEntry {
   items: HomeworkRecord[];
@@ -39,7 +33,6 @@ const defaultFilters: Filters = {
 
 type RunFetchArgs = {
   filters: Filters;
-  type: FilterValue;
   page: number;
   append: boolean;
   ignoreCache?: boolean;
@@ -49,7 +42,6 @@ export function HomePageClient() {
   const { accessToken } = useAuth();
   const [formFilters, setFormFilters] = useState<Filters>(defaultFilters);
   const [activeFilters, setActiveFilters] = useState<Filters>(defaultFilters);
-  const [typeFilter, setTypeFilter] = useState<FilterValue>(DEFAULT_TYPE);
   const [items, setItems] = useState<HomeworkRecord[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
@@ -59,8 +51,7 @@ export function HomePageClient() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  const mediaCacheRef = useRef<Map<string, CacheEntry>>(new Map());
-  const websiteCacheRef = useRef<Map<string, CacheEntry>>(new Map());
+  const cacheRef = useRef<Map<string, CacheEntry>>(new Map());
 
   const buildCacheKey = useCallback((filters: Filters) => {
     const school = filters.school.trim().toLowerCase();
@@ -72,26 +63,14 @@ export function HomePageClient() {
     const parts: string[] = [];
     if (activeFilters.school) parts.push(activeFilters.school);
     if (activeFilters.name) parts.push(`Name: ${activeFilters.name}`);
-    if (typeFilter !== "all" && typeFilter !== DEFAULT_TYPE) {
-      parts.push(typeFilter === "media" ? "Media" : "Website");
-    }
     return parts.join(" · ");
-  }, [activeFilters, typeFilter]);
+  }, [activeFilters]);
 
   const availableSchools = useMemo(() => [...APPROVED_SCHOOLS], []);
 
-  const resolveCacheType = useCallback(
-    (type: FilterValue) => (type === "website" ? "website" : "media"),
-    [],
-  );
-
   const syncFromCache = useCallback(
-    (filters: Filters, type: FilterValue) => {
-      const cacheMap =
-        resolveCacheType(type) === "website"
-          ? websiteCacheRef.current
-          : mediaCacheRef.current;
-      const cached = cacheMap.get(buildCacheKey(filters));
+    (filters: Filters) => {
+      const cached = cacheRef.current.get(buildCacheKey(filters));
       if (!cached) return false;
       setItems(cached.items);
       setPage(cached.page);
@@ -103,25 +82,15 @@ export function HomePageClient() {
       setError(null);
       return true;
     },
-    [buildCacheKey, resolveCacheType],
+    [buildCacheKey],
   );
 
   const runFetch = useCallback(
-    async ({
-      filters,
-      type,
-      page,
-      append,
-      ignoreCache = false,
-    }: RunFetchArgs) => {
+    async ({ filters, page, append, ignoreCache = false }: RunFetchArgs) => {
       if (!accessToken) return;
 
       const cacheKey = buildCacheKey(filters);
-      const cacheMap =
-        resolveCacheType(type) === "website"
-          ? websiteCacheRef.current
-          : mediaCacheRef.current;
-      const cachedEntry = cacheMap.get(cacheKey);
+      const cachedEntry = cacheRef.current.get(cacheKey);
 
       if (!append && !ignoreCache && cachedEntry) {
         setItems(cachedEntry.items);
@@ -148,28 +117,16 @@ export function HomePageClient() {
           pageSize: PAGE_SIZE,
           school: filters.school || undefined,
           name: filters.name || undefined,
+          category: "all",
           signal: controller.signal,
         };
 
-        let result:
-          | Awaited<ReturnType<typeof fetchHomeworks>>
-          | Awaited<ReturnType<typeof fetchHomeworksWithUrls>>;
-
-        if (type === "website") {
-          result = await fetchHomeworksWithUrls(commonParams, accessToken);
-        } else {
-          commonParams.category = "media";
-          result = await fetchHomeworks(commonParams, accessToken);
-        }
+        const result = await fetchHomeworks(commonParams, accessToken);
 
         if (controller.signal.aborted) return;
 
         let normalizedItems = result.items;
-        if (resolveCacheType(type) === "media") {
-          normalizedItems = normalizedItems.filter((item) => item.hasMedia);
-        } else if (type === "website") {
-          normalizedItems = normalizedItems.filter((item) => item.hasWebsite);
-        }
+        normalizedItems = normalizedItems.filter((item) => item);
 
         let nextItems: HomeworkRecord[] = [];
         setItems((prev) => {
@@ -207,7 +164,7 @@ export function HomePageClient() {
         setServerTotal(nextTotal);
         setServerHasMore(rawHasMore);
 
-        cacheMap.set(cacheKey, {
+        cacheRef.current.set(cacheKey, {
           items: nextItems,
           page: nextPage,
           hasMore: nextHasMore,
@@ -226,7 +183,7 @@ export function HomePageClient() {
         }
       }
     },
-    [accessToken, buildCacheKey, resolveCacheType],
+    [accessToken, buildCacheKey],
   );
 
   const handleSearch = () => {
@@ -236,33 +193,13 @@ export function HomePageClient() {
     setHasMore(false);
     setServerHasMore(null);
     setError(null);
-    syncFromCache(nextFilters, typeFilter);
-  };
-
-  const handleTypeChange = (next: FilterValue) => {
-    setTypeFilter(next);
-    setPage(1);
-    setHasMore(false);
-    setServerHasMore(null);
-    setError(null);
-    syncFromCache(activeFilters, next);
-  };
-
-  const handleRefresh = () => {
-    runFetch({
-      filters: activeFilters,
-      type: typeFilter,
-      page: 1,
-      append: false,
-      ignoreCache: true,
-    });
+    syncFromCache(nextFilters);
   };
 
   const loadMore = () => {
     if (loadingMore || !hasMore) return;
     runFetch({
       filters: activeFilters,
-      type: typeFilter,
       page: page + 1,
       append: true,
     });
@@ -272,11 +209,10 @@ export function HomePageClient() {
     if (!accessToken) return;
     runFetch({
       filters: activeFilters,
-      type: typeFilter,
       page: 1,
       append: false,
     });
-  }, [accessToken, activeFilters, typeFilter, runFetch]);
+  }, [accessToken, activeFilters, runFetch]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -308,11 +244,7 @@ export function HomePageClient() {
     });
   }, [items, activeFilters]);
 
-  const displayItems = useMemo(() => {
-    if (typeFilter === "website")
-      return filteredBySearch.filter((item) => item.hasWebsite);
-    return filteredBySearch.filter((item) => item.hasMedia);
-  }, [filteredBySearch, typeFilter]);
+  const displayItems = useMemo(() => filteredBySearch, [filteredBySearch]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -322,13 +254,6 @@ export function HomePageClient() {
         onChange={setFormFilters}
         onSubmit={handleSearch}
         loading={loading && !loadingMore}
-      />
-
-      <TypeFilter
-        value={typeFilter}
-        onChange={handleTypeChange}
-        onRefresh={handleRefresh}
-        refreshing={loading && !loadingMore}
       />
 
       {appliedFiltersLabel ? (

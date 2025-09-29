@@ -386,8 +386,3 @@ export const fetchHomeworks = async (
   params: HomeworkListParams = {},
   token?: string,
 ) => fetchHomeworksFromEndpoint("/api/homeworks", params, token);
-
-export const fetchHomeworksWithUrls = async (
-  params: HomeworkListParams = {},
-  token?: string,
-) => fetchHomeworksFromEndpoint("/api/homeworks/has/urls", params, token);
