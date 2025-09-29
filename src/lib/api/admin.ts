@@ -123,7 +123,7 @@ const normalizeHomeworkRecord = (item: unknown): AdminHomeworkRecord => {
     toTrimmedString(raw.submittedAt) ||
     toTrimmedString(raw.submitted_at);
 
-  const status = toTrimmedString(source?.status) ?? toTrimmedString(raw.status);
+  const status = toTrimmedString(source?.status) ?? toTrimmedString(raw.status) ?? undefined;
 
   const isTeamValue =
     source?.isTeam ??
