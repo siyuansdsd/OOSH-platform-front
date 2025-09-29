@@ -43,6 +43,7 @@ export function HomePageClient() {
   const [formFilters, setFormFilters] = useState<Filters>(defaultFilters);
   const [activeFilters, setActiveFilters] = useState<Filters>(defaultFilters);
   const [items, setItems] = useState<HomeworkRecord[]>([]);
+  const itemsRef = useRef<HomeworkRecord[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
   const [serverTotal, setServerTotal] = useState<number | null>(null);
@@ -52,6 +53,10 @@ export function HomePageClient() {
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
   const cacheRef = useRef<Map<string, CacheEntry>>(new Map());
+
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
 
   const buildCacheKey = useCallback((filters: Filters) => {
     const school = filters.school.trim().toLowerCase();
@@ -125,24 +130,20 @@ export function HomePageClient() {
 
         if (controller.signal.aborted) return;
 
-        let normalizedItems = result.items;
-        normalizedItems = normalizedItems.filter((item) => item);
+        const normalizedItems = result.items.filter(Boolean);
 
-        let nextItems: HomeworkRecord[] = [];
-        setItems((prev) => {
-          if (!append) {
-            nextItems = normalizedItems;
-            return nextItems;
-          }
+        const baseItems = append
+          ? (cachedEntry?.items ?? itemsRef.current)
+          : [];
+        const existingIds = new Set(baseItems.map((item) => item.id));
+        const uniqueNew = append
+          ? normalizedItems.filter((item) => !existingIds.has(item.id))
+          : normalizedItems;
+        const combinedItems = append
+          ? [...baseItems, ...uniqueNew]
+          : normalizedItems;
 
-          const base = cachedEntry?.items ?? prev;
-          const existingIds = new Set(base.map((item) => item.id));
-          const uniqueNew = normalizedItems.filter(
-            (item) => !existingIds.has(item.id),
-          );
-          nextItems = [...base, ...uniqueNew];
-          return nextItems;
-        });
+        setItems(combinedItems);
 
         const nextPage = result.page ?? page;
         const rawHasMore =
@@ -155,9 +156,7 @@ export function HomePageClient() {
         const nextTotal =
           typeof result.total === "number"
             ? result.total
-            : append && cachedEntry
-              ? cachedEntry.total
-              : normalizedItems.length;
+            : combinedItems.length;
 
         setPage(nextPage);
         setHasMore(nextHasMore);
@@ -165,7 +164,7 @@ export function HomePageClient() {
         setServerHasMore(rawHasMore);
 
         cacheRef.current.set(cacheKey, {
-          items: nextItems,
+          items: combinedItems,
           page: nextPage,
           hasMore: nextHasMore,
           total: nextTotal,
