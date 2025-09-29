@@ -1170,7 +1170,7 @@ export function AdminManagementClient() {
         </div>
       )}
 
-      {!isEmployee && (
+      {view === "users" && !isEmployee && (
         <section className="grid gap-6 lg:grid-cols-2">
           <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6">
             <h2 className="text-lg font-semibold text-foreground">
