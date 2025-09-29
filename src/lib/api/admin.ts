@@ -48,6 +48,97 @@ export interface PaginatedResult<T> {
   pageSize: number;
 }
 
+const toTrimmedString = (value: unknown): string | undefined => {
+  if (value === null || value === undefined) return undefined;
+  const str = typeof value === "string" ? value : String(value);
+  const trimmed = str.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+};
+
+const toStringArray = (value: unknown): string[] => {
+  if (value === null || value === undefined) return [];
+  if (Array.isArray(value)) {
+    return value
+      .map((entry) => toTrimmedString(entry))
+      .filter((entry): entry is string => Boolean(entry));
+  }
+  const single = toTrimmedString(value);
+  return single ? [single] : [];
+};
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object"
+    ? (value as Record<string, unknown>)
+    : null;
+
+const normalizeHomeworkRecord = (item: any): AdminHomeworkRecord => {
+  const raw = asRecord(item?.raw) ?? asRecord(item) ?? {};
+
+  const id =
+    toTrimmedString(item?.id) ||
+    toTrimmedString(raw.id) ||
+    toTrimmedString(raw.uuid) ||
+    toTrimmedString(raw.homeworkId) ||
+    "";
+
+  const title = toTrimmedString(item?.title) ?? toTrimmedString(raw.title);
+  const description =
+    toTrimmedString(item?.description) ?? toTrimmedString(raw.description);
+  const schoolName =
+    toTrimmedString(item?.schoolName) ||
+    toTrimmedString(raw.schoolName) ||
+    toTrimmedString(raw.school_name) ||
+    toTrimmedString(raw.school) ||
+    toTrimmedString(raw.schoolname);
+  const groupName =
+    toTrimmedString(item?.groupName) ||
+    toTrimmedString(raw.groupName) ||
+    toTrimmedString(raw.group_name) ||
+    toTrimmedString(raw.team_name);
+  const personName =
+    toTrimmedString(item?.personName) ||
+    toTrimmedString(raw.personName) ||
+    toTrimmedString(raw.person_name) ||
+    toTrimmedString(raw.student_name);
+
+  const membersSource = item?.members ?? raw.members;
+  const members = Array.isArray(membersSource)
+    ? membersSource
+        .map((entry: unknown) => toTrimmedString(entry))
+        .filter((entry): entry is string => Boolean(entry))
+    : [];
+
+  const images = toStringArray(item?.images ?? raw.images);
+  const videos = toStringArray(item?.videos ?? raw.videos);
+  const urls = toStringArray(item?.urls ?? raw.urls);
+
+  const createdAt =
+    toTrimmedString(item?.createdAt) ||
+    toTrimmedString(raw.createdAt) ||
+    toTrimmedString(raw.created_at);
+
+  const status = toTrimmedString(item?.status) ?? toTrimmedString(raw.status);
+
+  const isTeamValue =
+    item?.isTeam ?? raw.isTeam ?? raw.is_team ?? raw.team ?? raw.group ?? false;
+
+  return {
+    id,
+    title,
+    description,
+    schoolName,
+    groupName,
+    personName,
+    isTeam: Boolean(isTeamValue),
+    members,
+    images,
+    videos,
+    urls,
+    status,
+    createdAt,
+  };
+};
+
 async function send<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
   const res = await fetch(input, {
     cache: "no-store",
@@ -66,7 +157,7 @@ async function send<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
 
 export async function fetchAdminHomeworks(
   params: Record<string, string | number | undefined> = {},
-  token?: string
+  token?: string,
 ) {
   const res = await fetchHomeworks(params, token);
   const items: AdminHomeworkRecord[] = res.items.map((item: HomeworkRecord) => {
@@ -103,67 +194,11 @@ export async function fetchAllAdminHomeworks(token: string) {
       headers: {
         Authorization: `Bearer ${token}`,
       },
-    }
+    },
   );
 
   // Transform the raw data to AdminHomeworkRecord format (same as fetchAdminHomeworks)
-  const items: AdminHomeworkRecord[] = res.items.map((item: any) => {
-    const raw = item?.raw ?? item;
-
-    const schoolName =
-      item?.schoolName ??
-      raw?.schoolName ??
-      raw?.school_name ??
-      raw?.school ??
-      raw?.schoolname ??
-      "";
-
-    const groupName =
-      item?.groupName ?? raw?.groupName ?? raw?.group_name ?? raw?.team_name;
-
-    const personName =
-      item?.personName ?? raw?.personName ?? raw?.person_name ?? raw?.student_name;
-
-    const members = Array.isArray(item?.members)
-      ? item.members
-      : Array.isArray(raw?.members)
-      ? raw.members
-      : [];
-
-    const images = Array.isArray(item?.images)
-      ? item.images
-      : Array.isArray(raw?.images)
-      ? raw.images
-      : [];
-
-    const videos = Array.isArray(item?.videos)
-      ? item.videos
-      : Array.isArray(raw?.videos)
-      ? raw.videos
-      : [];
-
-    const urls = Array.isArray(item?.urls)
-      ? item.urls
-      : Array.isArray(raw?.urls)
-      ? raw.urls
-      : [];
-
-    return {
-      id: String(item?.id ?? raw?.id ?? raw?.uuid ?? ""),
-      title: item?.title ?? raw?.title,
-      description: item?.description ?? raw?.description,
-      schoolName,
-      groupName,
-      personName,
-      isTeam: item?.isTeam ?? raw?.isTeam ?? raw?.is_team ?? false,
-      members,
-      images,
-      videos,
-      urls,
-      status: item?.status ?? raw?.status,
-      createdAt: item?.createdAt ?? raw?.createdAt ?? raw?.created_at,
-    };
-  });
+  const items: AdminHomeworkRecord[] = res.items.map(normalizeHomeworkRecord);
 
   return {
     items,
@@ -174,7 +209,7 @@ export async function fetchAllAdminHomeworks(token: string) {
 
 export async function fetchAdminUsers(
   params: Record<string, string | number | undefined> = {},
-  token?: string
+  token?: string,
 ): Promise<PaginatedResult<UserItem> | UserItem[]> {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -190,44 +225,55 @@ export async function fetchAdminUsers(
             Authorization: `Bearer ${token}`,
           },
         }
-      : undefined
+      : undefined,
   );
 }
 
 export async function updateAdminHomework(
   id: string,
   payload: AdminHomeworkRecord,
-  token: string
+  token: string,
 ) {
+  const body: Record<string, unknown> = {
+    title: payload.title,
+    description: payload.description,
+    school_name: payload.schoolName,
+    is_team: payload.isTeam,
+    images: payload.images,
+    videos: payload.videos,
+    urls: payload.urls,
+  };
+
+  if (payload.isTeam) {
+    if (payload.groupName) body.group_name = payload.groupName;
+    body.members = payload.members ?? [];
+    // ensure personal fields cleared on backend if necessary
+    body.person_name = undefined;
+  } else {
+    if (payload.personName) body.person_name = payload.personName;
+    body.group_name = undefined;
+    body.members = [];
+  }
+
   const res = await fetch(`/api/homeworks/${encodeURIComponent(id)}`, {
     method: "PUT",
     headers: {
       "content-type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({
-      title: payload.title,
-      description: payload.description,
-      school_name: payload.schoolName,
-      group_name: payload.isTeam ? payload.groupName : null,
-      person_name: payload.isTeam ? null : payload.personName,
-      is_team: payload.isTeam,
-      members: payload.isTeam ? payload.members : [],
-      images: payload.images,
-      videos: payload.videos,
-      urls: payload.urls,
-    }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const text = await res.text();
     throw new Error(text || `HTTP ${res.status}`);
   }
-  return (await res.json()) as AdminHomeworkRecord;
+  const json = await res.json().catch(() => null);
+  return json ? normalizeHomeworkRecord(json) : payload;
 }
 
 export async function deleteAdminHomeworks(
   ids: string[],
-  token: string
+  token: string,
 ): Promise<{
   deleted: string[];
   failures: Array<{ id: string; message: string }>;
@@ -252,7 +298,9 @@ export async function deleteAdminHomeworks(
       deleted.push(id);
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : String(error ?? "Unknown error");
+        error instanceof Error
+          ? error.message
+          : String(error ?? "Unknown error");
       failures.push({ id, message });
     }
   }
@@ -263,7 +311,7 @@ export async function deleteAdminHomeworks(
 export async function updateAdminUser(
   id: string,
   payload: Partial<UserItem>,
-  token: string
+  token: string,
 ) {
   return send<UserItem>(`/api/admin/users/${id}`, {
     method: "PUT",
@@ -277,7 +325,7 @@ export async function updateAdminUser(
 export async function blockAdminUser(
   id: string,
   blocked: boolean,
-  token: string
+  token: string,
 ) {
   return send<UserItem>(`/api/admin/users/${id}/block`, {
     method: "POST",
@@ -302,7 +350,7 @@ export async function bulkUpdateAdminUsers(
     ids: string[];
     action: "delete" | "disable" | "enable" | "ban";
   },
-  token: string
+  token: string,
 ) {
   return send<{ updated: string[] }>(`/api/users`, {
     method: "POST",
@@ -320,7 +368,7 @@ export interface CreateTemporaryAccountInput {
 
 export async function createTemporaryAccount(
   input: CreateTemporaryAccountInput,
-  token: string
+  token: string,
 ) {
   return send<UserItem>(`/api/users`, {
     method: "POST",
@@ -347,11 +395,15 @@ export interface CreateEmployerAccountsInput {
 
 export async function createEmployerAccounts(
   input: CreateEmployerAccountsInput,
-  token: string
+  token: string,
 ) {
   return send<{ created: string[] }>(`/api/users`, {
     method: "POST",
-    body: JSON.stringify({ action: "createEmployerBatch", role: "employee", ...input }),
+    body: JSON.stringify({
+      action: "createEmployerBatch",
+      role: "employee",
+      ...input,
+    }),
     headers: {
       Authorization: `Bearer ${token}`,
     },
@@ -360,7 +412,7 @@ export async function createEmployerAccounts(
 
 export async function updateCurrentUser(
   payload: { password?: string },
-  token: string
+  token: string,
 ) {
   try {
     return await send<UserItem>(`/api/users/me`, {
@@ -385,12 +437,16 @@ export async function createEmployerAccount(
     email: string;
     password: string;
   },
-  token: string
+  token: string,
 ) {
   // Post a single employer account to the proxy. Backend may accept a single-create action.
   return send<UserItem>(`/api/users`, {
     method: "POST",
-    body: JSON.stringify({ action: "createEmployer", role: "employee", ...input }),
+    body: JSON.stringify({
+      action: "createEmployer",
+      role: "employee",
+      ...input,
+    }),
     headers: {
       Authorization: `Bearer ${token}`,
     },

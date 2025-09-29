@@ -42,7 +42,7 @@ export function AdminManagementClient() {
   const isEmployee = (user?.role || "").toLowerCase() === "employee";
   const [view, setView] = useState<ViewMode>("homeworks");
   const [homeworksCache, setHomeworksCache] = useState<AdminHomeworkRecord[]>(
-    []
+    [],
   );
   const [homeworksCacheLoaded, setHomeworksCacheLoaded] = useState(false);
   const [users, setUsers] = useState<UserItem[]>([]);
@@ -70,16 +70,16 @@ export function AdminManagementClient() {
     username?: string;
   }
   const [employerDrafts, setEmployerDrafts] = useState<EmployeeDraftInternal[]>(
-    [{ display_name: "", email: "", password: "", username: "" }]
+    [{ display_name: "", email: "", password: "", username: "" }],
   );
   const [creatingEmployers, setCreatingEmployers] = useState(false);
   const [bulkActionLoading, setBulkActionLoading] = useState<string | null>(
-    null
+    null,
   );
 
   const schoolOptions = useMemo(
     () => [...APPROVED_SCHOOLS].sort((a, b) => a.localeCompare(b)),
-    []
+    [],
   );
 
   useEffect(() => {
@@ -109,7 +109,7 @@ export function AdminManagementClient() {
 
   const toggleUserExpanded = (id: string) => {
     setExpandedUserIds((prev) =>
-      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
     );
   };
 
@@ -129,8 +129,8 @@ export function AdminManagementClient() {
         const list = Array.isArray(res)
           ? res
           : Array.isArray(res.items)
-          ? res.items
-          : [];
+            ? res.items
+            : [];
         setUsers(list as UserItem[]);
       }
     } catch (err: any) {
@@ -164,8 +164,8 @@ export function AdminManagementClient() {
       const list = Array.isArray(res)
         ? res
         : Array.isArray(res.items)
-        ? res.items
-        : [];
+          ? res.items
+          : [];
 
       // Only update users of the specific type
       const newUsers = list as UserItem[];
@@ -282,7 +282,7 @@ export function AdminManagementClient() {
 
   const toggleSelection = (id: string) => {
     setSelectedIds((prev) =>
-      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
     );
   };
 
@@ -291,7 +291,7 @@ export function AdminManagementClient() {
       view === "homeworks" ? paginatedRecords : filteredRecords
     ).map((item) => item.id);
     const displayedSelected = selectedIds.filter((id) =>
-      displayed.includes(id)
+      displayed.includes(id),
     );
     if (displayedSelected.length === displayed.length) {
       setSelectedIds((prev) => prev.filter((id) => !displayed.includes(id)));
@@ -331,7 +331,7 @@ export function AdminManagementClient() {
       if (editing.type === "homeworks") {
         // Optimistic update: immediately update cache
         const updatedCache = homeworksCache.map((item) =>
-          item.id === editing.draft.id ? editing.draft : item
+          item.id === editing.draft.id ? editing.draft : item,
         );
         setHomeworksCache(updatedCache);
 
@@ -339,12 +339,12 @@ export function AdminManagementClient() {
         const updatedRecord = await updateAdminHomework(
           editing.draft.id,
           editing.draft,
-          accessToken
+          accessToken,
         );
 
         // Reconcile with backend response
         const reconciledCache = homeworksCache.map((item) =>
-          item.id === editing.draft.id ? updatedRecord : item
+          item.id === editing.draft.id ? updatedRecord : item,
         );
         setHomeworksCache(reconciledCache);
       } else {
@@ -365,7 +365,7 @@ export function AdminManagementClient() {
 
         // Optimistic update for users
         const updatedUsers = users.map((user) =>
-          user.id === draft.id ? { ...user, ...payload } : user
+          user.id === draft.id ? { ...user, ...payload } : user,
         );
         setUsers(updatedUsers);
 
@@ -373,12 +373,12 @@ export function AdminManagementClient() {
         const updatedUser = await updateAdminUser(
           draft.id,
           payload,
-          accessToken
+          accessToken,
         );
 
         // Reconcile with backend response
         const reconciledUsers = users.map((user) =>
-          user.id === draft.id ? updatedUser : user
+          user.id === draft.id ? updatedUser : user,
         );
         setUsers(reconciledUsers);
       }
@@ -397,7 +397,7 @@ export function AdminManagementClient() {
   };
 
   const handleBulkAction = async (
-    action: "delete" | "disable" | "ban" | "enable"
+    action: "delete" | "disable" | "ban" | "enable",
   ) => {
     setBulkActionLoading(action);
 
@@ -418,16 +418,16 @@ export function AdminManagementClient() {
           }
 
           const lookup = new Map(
-            homeworksCache.map((record) => [record.id, record] as const)
+            homeworksCache.map((record) => [record.id, record] as const),
           );
           const { deleted, failures } = await deleteAdminHomeworks(
             idsToDelete,
-            accessToken
+            accessToken,
           );
 
           if (deleted.length > 0) {
             setHomeworksCache((prev) =>
-              prev.filter((item) => !deleted.includes(item.id))
+              prev.filter((item) => !deleted.includes(item.id)),
             );
           }
 
@@ -453,24 +453,24 @@ export function AdminManagementClient() {
 
           // Optimistic update: update blocked status
           const updatedUsers = users.map((user) =>
-            selectedIds.includes(user.id) ? { ...user, blocked: block } : user
+            selectedIds.includes(user.id) ? { ...user, blocked: block } : user,
           );
           setUsers(updatedUsers);
 
           // Call backend
           await Promise.all(
-            selectedIds.map((id) => blockAdminUser(id, block, accessToken))
+            selectedIds.map((id) => blockAdminUser(id, block, accessToken)),
           );
         } else if (action === "ban" || action === "delete") {
           // Optimistic update: remove users
           const updatedUsers = users.filter(
-            (user) => !selectedIds.includes(user.id)
+            (user) => !selectedIds.includes(user.id),
           );
           setUsers(updatedUsers);
 
           // Call backend
           await Promise.all(
-            selectedIds.map((id) => deleteAdminUser(id, accessToken))
+            selectedIds.map((id) => deleteAdminUser(id, accessToken)),
           );
         } else {
           // Fallback to bulk API if action supported
@@ -520,7 +520,7 @@ export function AdminManagementClient() {
       .filter((draft) => draft.display_name && draft.email && draft.password);
     if (accounts.length === 0) {
       setError(
-        "Please provide at least one row with display name, email and password."
+        "Please provide at least one row with display name, email and password.",
       );
       return;
     }
@@ -530,10 +530,10 @@ export function AdminManagementClient() {
     if (invalid.length > 0) {
       console.warn(
         "Invalid employer accounts (missing username/password):",
-        invalid
+        invalid,
       );
       setError(
-        "One or more accounts are missing username or password. Email will be used as username if provided."
+        "One or more accounts are missing username or password. Email will be used as username if provided.",
       );
       return;
     }
@@ -564,13 +564,13 @@ export function AdminManagementClient() {
   };
 
   const displayedSelected = selectedIds.filter((id) =>
-    filteredRecords.some((record) => record.id === id)
+    filteredRecords.some((record) => record.id === id),
   );
 
   const temporaryUsers = useMemo(
     () =>
       users.filter((user) => (user.role || "").toLowerCase() === "temporary"),
-    [users]
+    [users],
   );
 
   const employerUsers = useMemo(
@@ -579,7 +579,7 @@ export function AdminManagementClient() {
         const r = (user.role || "").toLowerCase();
         return r === "employee";
       }),
-    [users]
+    [users],
   );
 
   const renderHomeworkRow = (record: AdminHomeworkRecord) => (
@@ -925,7 +925,22 @@ export function AdminManagementClient() {
                   <input
                     type="checkbox"
                     onChange={toggleSelectAll}
-                    checked={(view === "homeworks" ? paginatedRecords : filteredRecords).length > 0 && selectedIds.filter(id => (view === "homeworks" ? paginatedRecords : filteredRecords).some(record => record.id === id)).length === (view === "homeworks" ? paginatedRecords : filteredRecords).length}
+                    checked={
+                      (view === "homeworks"
+                        ? paginatedRecords
+                        : filteredRecords
+                      ).length > 0 &&
+                      selectedIds.filter((id) =>
+                        (view === "homeworks"
+                          ? paginatedRecords
+                          : filteredRecords
+                        ).some((record) => record.id === id),
+                      ).length ===
+                        (view === "homeworks"
+                          ? paginatedRecords
+                          : filteredRecords
+                        ).length
+                    }
                     className="size-4"
                   />
                 </th>
@@ -945,7 +960,12 @@ export function AdminManagementClient() {
                   <input
                     type="checkbox"
                     onChange={toggleSelectAll}
-                    checked={filteredRecords.length > 0 && selectedIds.filter(id => filteredRecords.some(record => record.id === id)).length === filteredRecords.length}
+                    checked={
+                      filteredRecords.length > 0 &&
+                      selectedIds.filter((id) =>
+                        filteredRecords.some((record) => record.id === id),
+                      ).length === filteredRecords.length
+                    }
                     className="size-4"
                   />
                 </th>
@@ -1085,7 +1105,7 @@ export function AdminManagementClient() {
                               </span>{" "}
                               {record.refresh_token_expires_at
                                 ? new Date(
-                                    record.refresh_token_expires_at
+                                    record.refresh_token_expires_at,
                                   ).toLocaleString()
                                 : "—"}
                             </div>
@@ -1280,7 +1300,7 @@ export function AdminManagementClient() {
                     type="button"
                     onClick={() =>
                       setEmployerDrafts((prev) =>
-                        prev.slice(0, Math.max(1, prev.length - 1))
+                        prev.slice(0, Math.max(1, prev.length - 1)),
                       )
                     }
                     className="rounded-lg border border-foreground/20 px-3 py-1 text-xs font-medium"
@@ -1295,7 +1315,8 @@ export function AdminManagementClient() {
                 disabled={
                   creatingEmployers ||
                   !employerDrafts.some(
-                    (d) => d.display_name.trim() && d.email.trim() && d.password
+                    (d) =>
+                      d.display_name.trim() && d.email.trim() && d.password,
                   )
                 }
                 className="inline-flex w-fit items-center justify-center rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background disabled:cursor-not-allowed disabled:opacity-60"
@@ -1372,16 +1393,16 @@ export function AdminManagementClient() {
                                 await blockAdminUser(
                                   user.id,
                                   !user.blocked,
-                                  accessToken
+                                  accessToken,
                                 );
                                 await refreshSpecificUsers("temporary");
                               } catch (err: any) {
                                 setError(
-                                  err?.message || "Block/Unblock failed"
+                                  err?.message || "Block/Unblock failed",
                                 );
                               } finally {
                                 setBlockingIds((prev) =>
-                                  prev.filter((id) => id !== user.id)
+                                  prev.filter((id) => id !== user.id),
                                 );
                               }
                             }}
@@ -1390,8 +1411,8 @@ export function AdminManagementClient() {
                             {blockingIds.includes(user.id)
                               ? "Processing..."
                               : user.blocked
-                              ? "Unblock"
-                              : "Block"}
+                                ? "Unblock"
+                                : "Block"}
                           </button>
                           <button
                             type="button"
@@ -1399,7 +1420,7 @@ export function AdminManagementClient() {
                             onClick={async () => {
                               if (
                                 !window.confirm(
-                                  "Are you sure you want to delete this temporary account?"
+                                  "Are you sure you want to delete this temporary account?",
                                 )
                               )
                                 return;
@@ -1413,7 +1434,7 @@ export function AdminManagementClient() {
                                 setError(err?.message || "Delete failed");
                               } finally {
                                 setBlockingIds((prev) =>
-                                  prev.filter((id) => id !== user.id)
+                                  prev.filter((id) => id !== user.id),
                                 );
                               }
                             }}
@@ -1489,16 +1510,16 @@ export function AdminManagementClient() {
                                 await blockAdminUser(
                                   user.id,
                                   !user.blocked,
-                                  accessToken
+                                  accessToken,
                                 );
                                 await refreshSpecificUsers("employee");
                               } catch (err: any) {
                                 setError(
-                                  err?.message || "Block/Unblock failed"
+                                  err?.message || "Block/Unblock failed",
                                 );
                               } finally {
                                 setBlockingIds((prev) =>
-                                  prev.filter((id) => id !== user.id)
+                                  prev.filter((id) => id !== user.id),
                                 );
                               }
                             }}
@@ -1507,8 +1528,8 @@ export function AdminManagementClient() {
                             {blockingIds.includes(user.id)
                               ? "Processing..."
                               : user.blocked
-                              ? "Unblock"
-                              : "Block"}
+                                ? "Unblock"
+                                : "Block"}
                           </button>
                           <button
                             type="button"
@@ -1516,7 +1537,7 @@ export function AdminManagementClient() {
                             onClick={async () => {
                               if (
                                 !window.confirm(
-                                  "Are you sure you want to delete this employee account?"
+                                  "Are you sure you want to delete this employee account?",
                                 )
                               )
                                 return;
@@ -1530,7 +1551,7 @@ export function AdminManagementClient() {
                                 setError(err?.message || "Delete failed");
                               } finally {
                                 setBlockingIds((prev) =>
-                                  prev.filter((id) => id !== user.id)
+                                  prev.filter((id) => id !== user.id),
                                 );
                               }
                             }}
@@ -1580,7 +1601,7 @@ export function AdminManagementClient() {
                               original: prev.original,
                               draft: { ...prev.draft, title: e.target.value },
                             }
-                          : prev
+                          : prev,
                       )
                     }
                     className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
@@ -1601,7 +1622,7 @@ export function AdminManagementClient() {
                                 description: e.target.value,
                               },
                             }
-                          : prev
+                          : prev,
                       )
                     }
                     className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
@@ -1623,7 +1644,7 @@ export function AdminManagementClient() {
                                 schoolName: e.target.value,
                               },
                             }
-                          : prev
+                          : prev,
                       )
                     }
                     className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
@@ -1642,18 +1663,27 @@ export function AdminManagementClient() {
                       type="checkbox"
                       checked={Boolean(editingHomework.isTeam)}
                       onChange={(e) =>
-                        setEditing((prev) =>
-                          prev && prev.type === "homeworks"
-                            ? {
-                                type: "homeworks",
-                                original: prev.original,
-                                draft: {
-                                  ...prev.draft,
-                                  isTeam: e.target.checked,
-                                },
-                              }
-                            : prev
-                        )
+                        setEditing((prev) => {
+                          if (!prev || prev.type !== "homeworks") return prev;
+                          const checked = e.target.checked;
+                          return {
+                            type: "homeworks",
+                            original: prev.original,
+                            draft: {
+                              ...prev.draft,
+                              isTeam: checked,
+                              members: checked
+                                ? prev.draft.members &&
+                                  prev.draft.members.length > 0
+                                  ? prev.draft.members
+                                  : []
+                                : [],
+                              personName: checked
+                                ? ""
+                                : prev.draft.personName || "",
+                            },
+                          };
+                        })
                       }
                       className="size-4 rounded border-foreground/30 accent-blue-600"
                     />
@@ -1678,10 +1708,11 @@ export function AdminManagementClient() {
                                     groupName: e.target.value,
                                   },
                                 }
-                              : prev
+                              : prev,
                           )
                         }
                         className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
+                        placeholder="Enter team name"
                       />
                     </label>
                     <label className="text-sm text-foreground/80">
@@ -1702,10 +1733,11 @@ export function AdminManagementClient() {
                                       .filter(Boolean),
                                   },
                                 }
-                              : prev
+                              : prev,
                           )
                         }
                         className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
+                        placeholder="Member names (comma separated)"
                       />
                     </label>
                   </>
@@ -1725,7 +1757,7 @@ export function AdminManagementClient() {
                                   personName: e.target.value,
                                 },
                               }
-                            : prev
+                            : prev,
                         )
                       }
                       className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
@@ -1755,7 +1787,7 @@ export function AdminManagementClient() {
                                     username: e.target.value,
                                   },
                                 }
-                              : prev
+                              : prev,
                           )
                         }
                         className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
@@ -1776,7 +1808,7 @@ export function AdminManagementClient() {
                                     role: e.target.value as Role,
                                   },
                                 }
-                              : prev
+                              : prev,
                           )
                         }
                         className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
@@ -1802,7 +1834,7 @@ export function AdminManagementClient() {
                                     blocked: e.target.checked,
                                   },
                                 }
-                              : prev
+                              : prev,
                           )
                         }
                       />
@@ -1837,7 +1869,7 @@ export function AdminManagementClient() {
                                     display_name: e.target.value,
                                   },
                                 }
-                              : prev
+                              : prev,
                           )
                         }
                         className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
@@ -1858,7 +1890,7 @@ export function AdminManagementClient() {
                                     email: e.target.value,
                                   },
                                 }
-                              : prev
+                              : prev,
                           )
                         }
                         className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
@@ -1879,7 +1911,7 @@ export function AdminManagementClient() {
                                     blocked: e.target.checked,
                                   },
                                 }
-                              : prev
+                              : prev,
                           )
                         }
                       />
@@ -1913,7 +1945,7 @@ export function AdminManagementClient() {
                                     username: e.target.value,
                                   },
                                 }
-                              : prev
+                              : prev,
                           )
                         }
                         className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
@@ -1934,7 +1966,7 @@ export function AdminManagementClient() {
                                     email: e.target.value,
                                   },
                                 }
-                              : prev
+                              : prev,
                           )
                         }
                         className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
@@ -1955,7 +1987,7 @@ export function AdminManagementClient() {
                                     role: e.target.value as Role,
                                   },
                                 }
-                              : prev
+                              : prev,
                           )
                         }
                         className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
@@ -1981,7 +2013,7 @@ export function AdminManagementClient() {
                                     blocked: e.target.checked,
                                   },
                                 }
-                              : prev
+                              : prev,
                           )
                         }
                       />
@@ -2002,7 +2034,7 @@ export function AdminManagementClient() {
                                     display_name: e.target.value,
                                   },
                                 }
-                              : prev
+                              : prev,
                           )
                         }
                         className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
@@ -2045,5 +2077,3 @@ export function AdminManagementClient() {
     </div>
   );
 }
-
-
