@@ -6,6 +6,7 @@ const ALLOWED_ACTIONS = new Set([
   "admin-login",
   "refresh",
   "logout",
+  "hubspot-login",
 ]);
 
 const errorMessage = (error: unknown) =>
@@ -13,21 +14,18 @@ const errorMessage = (error: unknown) =>
 
 export async function POST(
   req: Request,
-  { params }: { params: Promise<{ action: string }> }
+  { params }: { params: Promise<{ action: string }> },
 ) {
   const { action } = await params;
   if (!ALLOWED_ACTIONS.has(action)) {
-    return NextResponse.json(
-      { message: "Not Found" },
-      { status: 404 }
-    );
+    return NextResponse.json({ message: "Not Found" }, { status: 404 });
   }
 
   const base = process.env.NEXT_PUBLIC_API_BASE ?? process.env.API_BASE;
   if (!base) {
     return NextResponse.json(
       { message: "Server not configured (API_BASE)" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
@@ -57,7 +55,7 @@ export async function POST(
   } catch (error: unknown) {
     return NextResponse.json(
       { message: errorMessage(error) || "Proxy failed" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

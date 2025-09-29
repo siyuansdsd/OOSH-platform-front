@@ -1,6 +1,7 @@
 "use client";
 
-import React, {
+import type { ReactNode } from "react";
+import {
   createContext,
   useCallback,
   useContext,
@@ -10,14 +11,13 @@ import React, {
   useState,
 } from "react";
 import {
+  logout as apiLogout,
+  type LoginResponse,
   loginAdmin,
   loginUser,
-  logout as apiLogout,
   refreshTokens,
   sendVerificationCode,
-  verifyCode,
   updateCurrentUser,
-  type LoginResponse,
 } from "@/lib/auth/api";
 
 interface AuthSession extends LoginResponse {
@@ -30,12 +30,24 @@ interface AuthContextValue {
   refreshToken: string | null;
   scope: string | null;
   loading: boolean;
-  sendCode: (email: string, options?: { password?: string; purpose?: "register" | "login" }) => Promise<void>;
-  login: (options: { email: string; password?: string; code: string; isAdmin?: boolean }) => Promise<void>;
-  loginWithPassword: (options: { username: string; password: string }) => Promise<void>;
+  sendCode: (
+    email: string,
+    options?: { password?: string; purpose?: "register" | "login" },
+  ) => Promise<void>;
+  login: (options: {
+    email: string;
+    password?: string;
+    code: string;
+    isAdmin?: boolean;
+  }) => Promise<void>;
+  loginWithPassword: (options: {
+    username: string;
+    password: string;
+  }) => Promise<void>;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   updateProfile: (displayName: string) => Promise<void>;
+  adoptLoginResponse: (response: LoginResponse) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -84,31 +96,61 @@ function writeStoredSession(session: AuthSession | null) {
   }
 }
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<AuthSession | null>(() => readStoredSession());
+export function AuthProvider({ children }: { children: ReactNode }) {
+  const [session, setSession] = useState<AuthSession | null>(() =>
+    readStoredSession(),
+  );
   const [loading, setLoading] = useState(true);
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const scheduleRefresh = (delay = REFRESH_INTERVAL_MS) => {
-    if (refreshTimer.current) clearTimeout(refreshTimer.current);
+  const setFromResponse = useCallback((resp: LoginResponse) => {
+    const tokenExpiresAt = Date.now() + parseExpiresIn(resp.expiresIn);
+    const next: AuthSession = {
+      ...resp,
+      tokenExpiresAt,
+    };
+    setSession(next);
+  }, []);
+
+  const doRefresh = useCallback(async () => {
     if (!session?.refreshToken) return;
-    refreshTimer.current = setTimeout(() => {
-      void doRefresh();
-    }, delay);
-  };
+    try {
+      const resp = await refreshTokens(
+        session.refreshToken,
+        session.user.scope,
+      );
+      setFromResponse(resp);
+    } catch (error) {
+      console.error("Refresh failed", error);
+      setSession(null);
+    }
+  }, [session?.refreshToken, session?.user.scope, setFromResponse]);
+
+  const scheduleRefresh = useCallback(
+    (delay = REFRESH_INTERVAL_MS) => {
+      if (refreshTimer.current) clearTimeout(refreshTimer.current);
+      if (!session?.refreshToken) return;
+      refreshTimer.current = setTimeout(() => {
+        void doRefresh();
+      }, delay);
+    },
+    [session?.refreshToken, doRefresh],
+  );
 
   useEffect(() => {
     if (session) {
       writeStoredSession(session);
       const expiresInMs = session.tokenExpiresAt - Date.now();
-      const delay = Math.min(REFRESH_INTERVAL_MS, Math.max(5 * 60 * 1000, expiresInMs - 5 * 60 * 1000));
+      const delay = Math.min(
+        REFRESH_INTERVAL_MS,
+        Math.max(5 * 60 * 1000, expiresInMs - 5 * 60 * 1000),
+      );
       scheduleRefresh(delay);
     } else {
       writeStoredSession(null);
       if (refreshTimer.current) clearTimeout(refreshTimer.current);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.token, session?.refreshToken, session?.tokenExpiresAt]);
+  }, [session, scheduleRefresh]);
 
   useEffect(() => {
     setLoading(false);
@@ -121,54 +163,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!loading && session && session.tokenExpiresAt <= Date.now()) {
       void doRefresh();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading]);
+  }, [loading, session, doRefresh]);
 
-  const setFromResponse = (resp: LoginResponse) => {
-    const tokenExpiresAt = Date.now() + parseExpiresIn(resp.expiresIn);
-    const next: AuthSession = {
-      ...resp,
-      tokenExpiresAt,
-    };
-    setSession(next);
-  };
+  const sendCode = useCallback(
+    async (
+      email: string,
+      options?: { password?: string; purpose?: "register" | "login" },
+    ) => {
+      await sendVerificationCode(email, options);
+    },
+    [],
+  );
 
-  const doRefresh = async () => {
-    if (!session?.refreshToken) return;
-    try {
-      const resp = await refreshTokens(session.refreshToken, session.user.scope);
+  const login = useCallback(
+    async ({
+      email,
+      password,
+      code,
+      isAdmin,
+    }: {
+      email: string;
+      password?: string;
+      code: string;
+      isAdmin?: boolean;
+    }) => {
+      const resp = await (isAdmin
+        ? loginAdmin(email, password || "", code)
+        : loginUser({ email, code }));
       setFromResponse(resp);
-    } catch (error) {
-      console.error("Refresh failed", error);
-      setSession(null);
-    }
-  };
+    },
+    [setFromResponse],
+  );
 
-  const sendCode = async (
-    email: string,
-    options?: { password?: string; purpose?: "register" | "login" }
-  ) => {
-    await sendVerificationCode(email, options);
-  };
-
-  const login = async ({
-    email,
-    password,
-    code,
-    isAdmin,
-  }: {
-    email: string;
-    password?: string;
-    code: string;
-    isAdmin?: boolean;
-  }) => {
-    const resp = await (isAdmin
-      ? loginAdmin(email, password || "", code)
-      : loginUser({ email, code }));
-    setFromResponse(resp);
-  };
-
-  const logout = async () => {
+  const logout = useCallback(async () => {
     if (session?.token) {
       try {
         await apiLogout(session.token);
@@ -177,17 +204,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     }
     setSession(null);
-  };
+  }, [session?.token]);
 
-  const loginWithPassword = async ({ username, password }: { username: string; password: string }) => {
-    const resp = await loginUser({ username: username.trim(), password });
-    setFromResponse(resp);
-  };
+  const loginWithPassword = useCallback(
+    async ({ username, password }: { username: string; password: string }) => {
+      const resp = await loginUser({ username: username.trim(), password });
+      setFromResponse(resp);
+    },
+    [setFromResponse],
+  );
+
+  const adoptLoginResponse = useCallback(
+    (response: LoginResponse) => {
+      setFromResponse(response);
+    },
+    [setFromResponse],
+  );
 
   const updateProfile = useCallback(
     async (displayName: string) => {
       if (!session?.token) throw new Error("Not authenticated");
-      const updatedUser = await updateCurrentUser({ display_name: displayName }, session.token);
+      const updatedUser = await updateCurrentUser(
+        { display_name: displayName },
+        session.token,
+      );
       setSession((prev) =>
         prev
           ? {
@@ -198,10 +238,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 display_name: updatedUser.display_name ?? displayName,
               },
             }
-          : prev
+          : prev,
       );
     },
-    [session?.token]
+    [session?.token],
   );
 
   const value = useMemo<AuthContextValue>(
@@ -217,8 +257,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       logout,
       refresh: doRefresh,
       updateProfile,
+      adoptLoginResponse,
     }),
-    [session, loading, updateProfile]
+    [
+      session,
+      loading,
+      sendCode,
+      login,
+      loginWithPassword,
+      logout,
+      doRefresh,
+      updateProfile,
+      adoptLoginResponse,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
