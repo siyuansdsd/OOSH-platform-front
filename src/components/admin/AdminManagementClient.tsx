@@ -611,7 +611,10 @@ export function AdminManagementClient() {
         {record.schoolName || "—"}
       </td>
       <td className="px-3 py-3 text-sm text-foreground/70">
-        {record.personName || record.groupName || "—"}
+        {record.isTeam ? record.groupName || "—" : "—"}
+      </td>
+      <td className="px-3 py-3 text-sm text-foreground/70">
+        {record.isTeam ? "—" : record.personName || "—"}
       </td>
       <td className="px-3 py-3 text-sm text-foreground/70">
         {record.members && record.members.length > 0
@@ -668,9 +671,6 @@ export function AdminManagementClient() {
       </td>
       <td className="whitespace-nowrap px-3 py-3 text-sm text-foreground/70">
         {record.createdAt || "—"}
-      </td>
-      <td className="px-3 py-3 text-sm capitalize text-foreground/70">
-        {record.status || "pending"}
       </td>
     </tr>
   );
@@ -814,9 +814,9 @@ export function AdminManagementClient() {
               >
                 <option value="createdAt">Sort by Created</option>
                 <option value="title">Sort by Title</option>
+                <option value="groupName">Sort by Team Name</option>
                 <option value="schoolName">Sort by School</option>
                 <option value="personName">Sort by Owner</option>
-                <option value="status">Sort by Status</option>
               </select>
               <button
                 type="button"
@@ -931,13 +931,13 @@ export function AdminManagementClient() {
                 </th>
                 <th className="px-3 py-3">Title</th>
                 <th className="px-3 py-3">School</th>
+                <th className="px-3 py-3">Team Name</th>
                 <th className="px-3 py-3">Owner</th>
                 <th className="px-3 py-3">Members</th>
                 <th className="px-3 py-3">Videos</th>
                 <th className="px-3 py-3">Images</th>
                 <th className="px-3 py-3">Websites</th>
                 <th className="px-3 py-3">Created</th>
-                <th className="px-3 py-3">Status</th>
               </tr>
             ) : (
               <tr>
@@ -1636,11 +1636,11 @@ export function AdminManagementClient() {
                     ))}
                   </select>
                 </label>
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <label className="text-sm text-foreground/80">
-                    Group name
+                <div className="flex items-center gap-3">
+                  <label className="inline-flex items-center gap-2 select-none">
                     <input
-                      value={editingHomework.groupName || ""}
+                      type="checkbox"
+                      checked={Boolean(editingHomework.isTeam)}
                       onChange={(e) =>
                         setEditing((prev) =>
                           prev && prev.type === "homeworks"
@@ -1649,15 +1649,67 @@ export function AdminManagementClient() {
                                 original: prev.original,
                                 draft: {
                                   ...prev.draft,
-                                  groupName: e.target.value,
+                                  isTeam: e.target.checked,
                                 },
                               }
                             : prev
                         )
                       }
-                      className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
+                      className="size-4 rounded border-foreground/30 accent-blue-600"
                     />
+                    <span className="text-sm">Team submission</span>
                   </label>
+                </div>
+
+                {editingHomework.isTeam ? (
+                  <>
+                    <label className="text-sm text-foreground/80">
+                      Team name
+                      <input
+                        value={editingHomework.groupName || ""}
+                        onChange={(e) =>
+                          setEditing((prev) =>
+                            prev && prev.type === "homeworks"
+                              ? {
+                                  type: "homeworks",
+                                  original: prev.original,
+                                  draft: {
+                                    ...prev.draft,
+                                    groupName: e.target.value,
+                                  },
+                                }
+                              : prev
+                          )
+                        }
+                        className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
+                      />
+                    </label>
+                    <label className="text-sm text-foreground/80">
+                      Members (comma separated)
+                      <input
+                        value={(editingHomework.members || []).join(", ")}
+                        onChange={(e) =>
+                          setEditing((prev) =>
+                            prev && prev.type === "homeworks"
+                              ? {
+                                  type: "homeworks",
+                                  original: prev.original,
+                                  draft: {
+                                    ...prev.draft,
+                                    members: e.target.value
+                                      .split(",")
+                                      .map((part) => part.trim())
+                                      .filter(Boolean),
+                                  },
+                                }
+                              : prev
+                          )
+                        }
+                        className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
+                      />
+                    </label>
+                  </>
+                ) : (
                   <label className="text-sm text-foreground/80">
                     Person name
                     <input
@@ -1679,45 +1731,7 @@ export function AdminManagementClient() {
                       className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
                     />
                   </label>
-                </div>
-                <label className="text-sm text-foreground/80">
-                  Members (comma separated)
-                  <input
-                    value={(editingHomework.members || []).join(", ")}
-                    onChange={(e) =>
-                      setEditing((prev) =>
-                        prev && prev.type === "homeworks"
-                          ? {
-                              type: "homeworks",
-                              original: prev.original,
-                              draft: {
-                                ...prev.draft,
-                                members: e.target.value
-                                  .split(",")
-                                  .map((part) => part.trim())
-                                  .filter(Boolean),
-                              },
-                            }
-                          : prev
-                      )
-                    }
-                    className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
-                  />
-                </label>
-
-                <ReadOnlyMediaSection
-                  label="Images"
-                  items={editingHomework.images || []}
-                  showPreview
-                />
-                <ReadOnlyMediaSection
-                  label="Videos"
-                  items={editingHomework.videos || []}
-                />
-                <ReadOnlyMediaSection
-                  label="Websites"
-                  items={editingHomework.urls || []}
-                />
+                )}
               </div>
             ) : null}
 
@@ -2032,48 +2046,4 @@ export function AdminManagementClient() {
   );
 }
 
-function ReadOnlyMediaSection({
-  label,
-  items,
-  showPreview,
-}: {
-  label: string;
-  items: string[];
-  showPreview?: boolean;
-}) {
-  return (
-    <div className="space-y-2">
-      <div className="text-sm font-medium text-foreground">{label}</div>
-      {items?.length ? (
-        <div className="grid gap-2 md:grid-cols-2">
-          {items.map((url) => (
-            <div
-              key={url}
-              className="flex items-center gap-2 rounded-xl border border-foreground/15 bg-background/40 p-2"
-            >
-              {showPreview ? (
-                <img
-                  src={url}
-                  alt="preview"
-                  className="h-16 w-16 rounded-lg object-cover"
-                />
-              ) : null}
-              <div className="flex-1 break-all text-sm">
-                <a
-                  href={url}
-                  className={`${linkClass} break-all`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {url}
-                </a>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-sm text-foreground/60">No entries</div>
-      )}
-    </div>
-  );
-}
+
