@@ -62,7 +62,7 @@ export function SearchBar({
       </label>
 
       <label className="flex flex-col gap-2 text-sm text-foreground/80 md:flex-[1.2]">
-        <span className="font-medium text-foreground">Student / Team Name</span>
+        <span className="font-medium text-foreground">Hacker / Team Name</span>
         <input
           type="text"
           inputMode="text"
