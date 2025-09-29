@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { APPROVED_SCHOOLS } from "@/constants/schools";
 import {
@@ -77,6 +77,7 @@ export function AdminManagementClient() {
   const router = useRouter();
   const isEmployee = (user?.role || "").toLowerCase() === "employee";
   const [view, setView] = useState<ViewMode>("homeworks");
+  const previousViewRef = useRef<ViewMode>(view);
   const [homeworksCache, setHomeworksCache] = useState<AdminHomeworkRecord[]>(
     [],
   );
@@ -221,6 +222,13 @@ export function AdminManagementClient() {
     homeworksCacheLoaded,
   ]);
 
+  useEffect(() => {
+    if (previousViewRef.current !== view) {
+      previousViewRef.current = view;
+      setCurrentPage(1);
+    }
+  }, [view]);
+
   // track which user rows are expanded to show full record details
   const [expandedUserIds, setExpandedUserIds] = useState<string[]>([]);
   const [editingPassword, setEditingPassword] = useState<string>("");
@@ -340,16 +348,23 @@ export function AdminManagementClient() {
 
   // Client-side pagination
   const paginatedRecords = useMemo(() => {
-    if (view !== "homeworks") return filteredRecords;
-
-    const startIndex = (currentPage - 1) * pageSize;
+    const startIndex = Math.max(0, (currentPage - 1) * pageSize);
     const endIndex = startIndex + pageSize;
     return filteredRecords.slice(startIndex, endIndex);
-  }, [filteredRecords, currentPage, pageSize, view]);
+  }, [filteredRecords, currentPage, pageSize]);
 
   const totalPages = Math.ceil(filteredRecords.length / pageSize);
   const hasNextPage = currentPage < totalPages;
   const hasPrevPage = currentPage > 1;
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(filteredRecords.length / pageSize));
+    setCurrentPage((prev) => {
+      if (prev < 1) return 1;
+      if (prev > maxPage) return maxPage;
+      return prev;
+    });
+  }, [filteredRecords.length, pageSize]);
 
   const toggleSelection = (id: string) => {
     setSelectedIds((prev) =>
@@ -358,16 +373,12 @@ export function AdminManagementClient() {
   };
 
   const toggleSelectAll = () => {
-    const displayed = (
-      view === "homeworks" ? paginatedRecords : filteredRecords
-    ).map((item) => item.id);
-    const displayedSelected = selectedIds.filter((id) =>
-      displayed.includes(id),
-    );
-    if (displayedSelected.length === displayed.length) {
-      setSelectedIds((prev) => prev.filter((id) => !displayed.includes(id)));
+    const visibleIds = paginatedRecords.map((item) => item.id);
+    const visibleSelected = selectedIds.filter((id) => visibleIds.includes(id));
+    if (visibleSelected.length === visibleIds.length) {
+      setSelectedIds((prev) => prev.filter((id) => !visibleIds.includes(id)));
     } else {
-      setSelectedIds((prev) => Array.from(new Set([...prev, ...displayed])));
+      setSelectedIds((prev) => Array.from(new Set([...prev, ...visibleIds])));
     }
   };
 
@@ -957,21 +968,21 @@ export function AdminManagementClient() {
               >
                 {sortDirection === "asc" ? "↑" : "↓"}
               </button>
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                className="rounded-lg border border-foreground/20 bg-background/70 px-3 py-2 text-sm"
-              >
-                <option value="10">10 per page</option>
-                <option value="20">20 per page</option>
-                <option value="50">50 per page</option>
-                <option value="100">100 per page</option>
-              </select>
             </>
           )}
+          <select
+            value={pageSize}
+            onChange={(e) => {
+              setPageSize(Number(e.target.value));
+              setCurrentPage(1);
+            }}
+            className="rounded-lg border border-foreground/20 bg-background/70 px-3 py-2 text-sm"
+          >
+            <option value="10">10 per page</option>
+            <option value="20">20 per page</option>
+            <option value="50">50 per page</option>
+            <option value="100">100 per page</option>
+          </select>
           {view === "homeworks" ? (
             <button
               type="button"
@@ -1056,20 +1067,10 @@ export function AdminManagementClient() {
                     type="checkbox"
                     onChange={toggleSelectAll}
                     checked={
-                      (view === "homeworks"
-                        ? paginatedRecords
-                        : filteredRecords
-                      ).length > 0 &&
+                      paginatedRecords.length > 0 &&
                       selectedIds.filter((id) =>
-                        (view === "homeworks"
-                          ? paginatedRecords
-                          : filteredRecords
-                        ).some((record) => record.id === id),
-                      ).length ===
-                        (view === "homeworks"
-                          ? paginatedRecords
-                          : filteredRecords
-                        ).length
+                        paginatedRecords.some((record) => record.id === id),
+                      ).length === paginatedRecords.length
                     }
                     className="size-4"
                   />
@@ -1091,10 +1092,10 @@ export function AdminManagementClient() {
                     type="checkbox"
                     onChange={toggleSelectAll}
                     checked={
-                      filteredRecords.length > 0 &&
+                      paginatedRecords.length > 0 &&
                       selectedIds.filter((id) =>
-                        filteredRecords.some((record) => record.id === id),
-                      ).length === filteredRecords.length
+                        paginatedRecords.some((record) => record.id === id),
+                      ).length === paginatedRecords.length
                     }
                     className="size-4"
                   />
@@ -1122,8 +1123,7 @@ export function AdminManagementClient() {
                   Loading…
                 </td>
               </tr>
-            ) : (view === "homeworks" ? paginatedRecords : filteredRecords)
-                .length === 0 ? (
+            ) : paginatedRecords.length === 0 ? (
               <tr>
                 <td
                   colSpan={view === "homeworks" ? 10 : 11}
@@ -1136,7 +1136,7 @@ export function AdminManagementClient() {
               (paginatedRecords as AdminHomeworkRecord[]).map(renderHomeworkRow)
             ) : (
               // For users, render the main row and optionally a details row
-              (filteredRecords as UserItem[]).flatMap((record) => {
+              (paginatedRecords as UserItem[]).flatMap((record) => {
                 const main = renderUserRow(record);
                 if (!expandedUserIds.includes(record.id)) return [main];
                 const detailsRow = (
@@ -1252,8 +1252,8 @@ export function AdminManagementClient() {
         </table>
       </div>
 
-      {/* Pagination controls for homeworks */}
-      {view === "homeworks" && filteredRecords.length > pageSize && (
+      {/* Pagination controls */}
+      {filteredRecords.length > pageSize && (
         <div className="flex items-center justify-between rounded-xl border border-foreground/10 bg-white/5 px-4 py-3">
           <div className="text-sm text-foreground/70">
             Showing {(currentPage - 1) * pageSize + 1} to{" "}
