@@ -1,21 +1,31 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { Gallery } from "@/components/home/Gallery";
 import { SearchBar } from "@/components/home/SearchBar";
 import { TypeFilter } from "@/components/home/TypeFilter";
 import { APPROVED_SCHOOLS } from "@/constants/schools";
 import {
   fetchHomeworks,
+  fetchHomeworksWithUrls,
   type HomeworkCategory,
+  type HomeworkListParams,
   type HomeworkRecord,
 } from "@/lib/api/homeworks";
-import { useAuth } from "@/components/auth/AuthProvider";
 
 const PAGE_SIZE = 12;
 
 type FilterValue = "all" | HomeworkCategory;
 const DEFAULT_TYPE: FilterValue = "media";
+
+interface CacheEntry {
+  items: HomeworkRecord[];
+  page: number;
+  hasMore: boolean;
+  total: number;
+  pageSize: number;
+}
 
 type Filters = {
   school: string;
@@ -25,6 +35,14 @@ type Filters = {
 const defaultFilters: Filters = {
   school: "",
   name: "",
+};
+
+type RunFetchArgs = {
+  filters: Filters;
+  type: FilterValue;
+  page: number;
+  append: boolean;
+  ignoreCache?: boolean;
 };
 
 export function HomePageClient() {
@@ -41,6 +59,15 @@ export function HomePageClient() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const mediaCacheRef = useRef<Map<string, CacheEntry>>(new Map());
+  const websiteCacheRef = useRef<Map<string, CacheEntry>>(new Map());
+  const allCacheRef = useRef<Map<string, CacheEntry>>(new Map());
+
+  const buildCacheKey = useCallback((filters: Filters) => {
+    const school = filters.school.trim().toLowerCase();
+    const name = filters.name.trim().toLowerCase();
+    return `${school || "*"}::${name || "*"}`;
+  }, []);
 
   const appliedFiltersLabel = useMemo(() => {
     const parts: string[] = [];
@@ -55,86 +82,148 @@ export function HomePageClient() {
   const availableSchools = useMemo(() => [...APPROVED_SCHOOLS], []);
 
   const runFetch = useCallback(
-    async (params: {
-      filters: Filters;
-      type: FilterValue;
-      page: number;
-      append: boolean;
-    }) => {
+    async ({
+      filters,
+      type,
+      page,
+      append,
+      ignoreCache = false,
+    }: RunFetchArgs) => {
       if (!accessToken) return;
+
+      const cacheKey = buildCacheKey(filters);
+      const cacheMap =
+        type === "website"
+          ? websiteCacheRef.current
+          : type === "media"
+            ? mediaCacheRef.current
+            : allCacheRef.current;
+      const cachedEntry = cacheMap.get(cacheKey);
+
+      if (!append && !ignoreCache && cachedEntry) {
+        setItems(cachedEntry.items);
+        setPage(cachedEntry.page);
+        setHasMore(cachedEntry.hasMore);
+        setServerTotal(cachedEntry.total);
+        setServerHasMore(cachedEntry.hasMore);
+        setLoading(false);
+        setLoadingMore(false);
+        setError(null);
+        return;
+      }
+
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
       setError(null);
-      if (params.append) setLoadingMore(true);
+      if (append) setLoadingMore(true);
       else setLoading(true);
+
       try {
-        const result = await fetchHomeworks(
-          {
-            page: params.page,
-            pageSize: PAGE_SIZE,
-            school: params.filters.school || undefined,
-            name: params.filters.name || undefined,
-            category: params.type === "all" ? undefined : params.type,
-            signal: controller.signal,
-          },
-          accessToken
-        );
+        const commonParams: HomeworkListParams = {
+          page,
+          pageSize: PAGE_SIZE,
+          school: filters.school || undefined,
+          name: filters.name || undefined,
+          signal: controller.signal,
+        };
+
+        let result:
+          | Awaited<ReturnType<typeof fetchHomeworks>>
+          | Awaited<ReturnType<typeof fetchHomeworksWithUrls>>;
+
+        if (type === "website") {
+          result = await fetchHomeworksWithUrls(commonParams, accessToken);
+        } else {
+          if (type === "media") {
+            commonParams.category = "media";
+          } else if (type === "all") {
+            commonParams.category = "all";
+          }
+          result = await fetchHomeworks(commonParams, accessToken);
+        }
+
         if (controller.signal.aborted) return;
+
+        let normalizedItems = result.items;
+        if (type === "media") {
+          normalizedItems = normalizedItems.filter((item) => item.hasMedia);
+        } else if (type === "website") {
+          normalizedItems = normalizedItems.filter((item) => item.hasWebsite);
+        }
+
+        let nextItems: HomeworkRecord[] = [];
         setItems((prev) => {
-          if (!params.append) return result.items;
-          // Append but avoid duplicates by id while preserving order: existing first, then new unique items
-          const existingIds = new Set(prev.map((it) => it.id));
-          const uniqueNew = result.items.filter(
-            (it) => !existingIds.has(it.id)
+          if (!append) {
+            nextItems = normalizedItems;
+            return nextItems;
+          }
+
+          const base = cachedEntry?.items ?? prev;
+          const existingIds = new Set(base.map((item) => item.id));
+          const uniqueNew = normalizedItems.filter(
+            (item) => !existingIds.has(item.id),
           );
-          return [...prev, ...uniqueNew];
+          nextItems = [...base, ...uniqueNew];
+          return nextItems;
         });
-        setPage(result.page);
-        setHasMore(result.hasMore);
-        setServerTotal(result.total ?? null);
-        setServerHasMore(result.hasMore ?? null);
+
+        const nextPage = result.page ?? page;
+        const rawHasMore =
+          typeof result.hasMore === "boolean" ? result.hasMore : null;
+        const nextHasMore =
+          rawHasMore !== null
+            ? rawHasMore
+            : normalizedItems.length > 0 &&
+              normalizedItems.length === (result.pageSize ?? PAGE_SIZE);
+        const nextTotal =
+          typeof result.total === "number"
+            ? result.total
+            : append && cachedEntry
+              ? cachedEntry.total
+              : normalizedItems.length;
+
+        setPage(nextPage);
+        setHasMore(nextHasMore);
+        setServerTotal(nextTotal);
+        setServerHasMore(rawHasMore);
+
+        cacheMap.set(cacheKey, {
+          items: nextItems,
+          page: nextPage,
+          hasMore: nextHasMore,
+          total: nextTotal,
+          pageSize: result.pageSize ?? PAGE_SIZE,
+        });
       } catch (error: unknown) {
         if (controller.signal.aborted) return;
         setError(
-          error instanceof Error ? error.message : "Failed to load data"
+          error instanceof Error ? error.message : "Failed to load data",
         );
       } finally {
         if (!controller.signal.aborted) {
-          if (params.append) setLoadingMore(false);
+          if (append) setLoadingMore(false);
           else setLoading(false);
         }
       }
     },
-    [accessToken]
+    [accessToken, buildCacheKey],
   );
 
-  const initialisedRef = useRef(false);
-
-  useEffect(() => {
-    if (!accessToken) return;
-    if (initialisedRef.current) return;
-    initialisedRef.current = true;
-    runFetch({
-      filters: activeFilters,
-      type: typeFilter,
-      page: 1,
-      append: false,
-    });
-  }, [accessToken, activeFilters, typeFilter, runFetch]);
-
   const handleSearch = () => {
-    setActiveFilters(formFilters);
-    runFetch({
-      filters: formFilters,
-      type: typeFilter,
-      page: 1,
-      append: false,
-    });
+    setActiveFilters({ ...formFilters });
+    setPage(1);
+    setHasMore(false);
+    setServerHasMore(null);
+    setError(null);
   };
 
   const handleTypeChange = (next: FilterValue) => {
     setTypeFilter(next);
+    setPage(1);
+    setHasMore(false);
+    setServerHasMore(null);
+    setError(null);
   };
 
   const handleRefresh = () => {
@@ -143,6 +232,7 @@ export function HomePageClient() {
       type: typeFilter,
       page: 1,
       append: false,
+      ignoreCache: true,
     });
   };
 
@@ -155,6 +245,16 @@ export function HomePageClient() {
       append: true,
     });
   };
+
+  useEffect(() => {
+    if (!accessToken) return;
+    runFetch({
+      filters: activeFilters,
+      type: typeFilter,
+      page: 1,
+      append: false,
+    });
+  }, [accessToken, activeFilters, typeFilter, runFetch]);
 
   useEffect(() => () => abortRef.current?.abort(), []);
 

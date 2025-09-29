@@ -41,12 +41,12 @@ const pick = <T>(...vals: Array<T | undefined | null>): T | undefined =>
 
 const pickFromSources = (
   sources: Array<Record<string, unknown> | undefined>,
-  keys: string[]
+  keys: string[],
 ) =>
   pick(
     ...sources.flatMap((source) =>
-      source ? keys.map((key) => source[key]) : []
-    )
+      source ? keys.map((key) => source[key]) : [],
+    ),
   );
 
 const toTrimmedString = (value: unknown): string => {
@@ -107,7 +107,7 @@ const findUrl = (value: unknown, depth = 0): string | undefined => {
         "assetUrl",
         "asset_url",
         "path",
-      ]
+      ],
     );
     if (typeof direct === "string" && looksLikeUrl(direct)) {
       return direct.trim();
@@ -138,7 +138,7 @@ const toPlainStringArray = (value: unknown) =>
       if (isRecord(entry)) {
         const candidate = pickFromSources(
           [entry],
-          ["name", "value", "label", "text"]
+          ["name", "value", "label", "text"],
         );
         if (typeof candidate === "string") return candidate.trim();
       }
@@ -148,7 +148,7 @@ const toPlainStringArray = (value: unknown) =>
 
 const getFromRecord = (
   record: Record<string, unknown>,
-  keys: string[]
+  keys: string[],
 ): unknown => pick(...keys.map((key) => record[key]));
 
 const toFiniteNumber = (value: unknown): number | undefined => {
@@ -216,13 +216,13 @@ const normalizeItem = (item: unknown): HomeworkRecord | null => {
   const createdAt = toTrimmedString(createdAtRaw);
 
   const images = toStringArray(
-    getFromRecord(item, ["images", "image_urls", "photos"])
+    getFromRecord(item, ["images", "image_urls", "photos"]),
   );
   const videos = toStringArray(
-    getFromRecord(item, ["videos", "video_urls", "media", "video"])
+    getFromRecord(item, ["videos", "video_urls", "media", "video"]),
   );
   const urls = toStringArray(
-    getFromRecord(item, ["urls", "links", "website", "websites"])
+    getFromRecord(item, ["urls", "links", "website", "websites"]),
   );
   const members = toPlainStringArray(
     getFromRecord(item, [
@@ -231,7 +231,7 @@ const normalizeItem = (item: unknown): HomeworkRecord | null => {
       "team_members",
       "memberNames",
       "member_names",
-    ])
+    ]),
   );
 
   const hasMedia = images.length > 0 || videos.length > 0;
@@ -264,7 +264,7 @@ const normalizeItem = (item: unknown): HomeworkRecord | null => {
 };
 
 const extractList = (
-  payload: unknown
+  payload: unknown,
 ): { items: unknown[]; meta: Record<string, unknown> } => {
   if (Array.isArray(payload)) return { items: payload, meta: {} };
   if (!isRecord(payload)) return { items: toUnknownArray(payload), meta: {} };
@@ -291,9 +291,10 @@ const extractList = (
   return { items: toUnknownArray(payload), meta: payload };
 };
 
-export const fetchHomeworks = async (
+const fetchHomeworksFromEndpoint = async (
+  endpoint: string,
   params: HomeworkListParams = {},
-  token?: string
+  token?: string,
 ) => {
   const searchParams = new URLSearchParams();
   if (params.page && params.page > 0)
@@ -311,7 +312,7 @@ export const fetchHomeworks = async (
     searchParams.set("type", params.category);
 
   const qs = searchParams.toString();
-  const res = await fetch(`/api/homeworks${qs ? `?${qs}` : ""}`, {
+  const res = await fetch(`${endpoint}${qs ? `?${qs}` : ""}`, {
     method: "GET",
     cache: "no-store",
     signal: params.signal,
@@ -380,3 +381,13 @@ export const fetchHomeworks = async (
     raw: parsed,
   } satisfies HomeworkListResult;
 };
+
+export const fetchHomeworks = async (
+  params: HomeworkListParams = {},
+  token?: string,
+) => fetchHomeworksFromEndpoint("/api/homeworks", params, token);
+
+export const fetchHomeworksWithUrls = async (
+  params: HomeworkListParams = {},
+  token?: string,
+) => fetchHomeworksFromEndpoint("/api/homeworks/has/urls", params, token);
