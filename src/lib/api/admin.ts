@@ -193,9 +193,10 @@ export async function fetchAdminHomeworks(
       images: item.images,
       videos: item.videos,
       urls: item.urls,
-      status: raw?.status,
-      submittedAt: raw?.submittedAt || raw?.createdAt,
-      ownerId: raw?.ownerId || raw?.userId,
+      status: toTrimmedString(raw?.status),
+      submittedAt:
+        toTrimmedString(raw?.submittedAt) || toTrimmedString(raw?.createdAt),
+      ownerId: toTrimmedString(raw?.ownerId) || toTrimmedString(raw?.userId),
     };
   });
   return {
