@@ -133,6 +133,12 @@ const normalizeHomeworkRecord = (item: unknown): AdminHomeworkRecord => {
     raw.group ??
     false;
 
+  const ownerId =
+    toTrimmedString(source?.ownerId) ||
+    toTrimmedString(raw.ownerId) ||
+    toTrimmedString(raw.userId) ||
+    undefined;
+
   return {
     id,
     title,
@@ -148,6 +154,7 @@ const normalizeHomeworkRecord = (item: unknown): AdminHomeworkRecord => {
     status,
     submittedAt,
     createdAt,
+    ownerId,
   };
 };
 
