@@ -108,23 +108,60 @@ export async function fetchAllAdminHomeworks(token: string) {
 
   // Transform the raw data to AdminHomeworkRecord format (same as fetchAdminHomeworks)
   const items: AdminHomeworkRecord[] = res.items.map((item: any) => {
-    const raw = item.raw || item;
+    const raw = item?.raw ?? item;
+
+    const schoolName =
+      item?.schoolName ??
+      raw?.schoolName ??
+      raw?.school_name ??
+      raw?.school ??
+      raw?.schoolname ??
+      "";
+
+    const groupName =
+      item?.groupName ?? raw?.groupName ?? raw?.group_name ?? raw?.team_name;
+
+    const personName =
+      item?.personName ?? raw?.personName ?? raw?.person_name ?? raw?.student_name;
+
+    const members = Array.isArray(item?.members)
+      ? item.members
+      : Array.isArray(raw?.members)
+      ? raw.members
+      : [];
+
+    const images = Array.isArray(item?.images)
+      ? item.images
+      : Array.isArray(raw?.images)
+      ? raw.images
+      : [];
+
+    const videos = Array.isArray(item?.videos)
+      ? item.videos
+      : Array.isArray(raw?.videos)
+      ? raw.videos
+      : [];
+
+    const urls = Array.isArray(item?.urls)
+      ? item.urls
+      : Array.isArray(raw?.urls)
+      ? raw.urls
+      : [];
+
     return {
-      id: item.id,
-      title: item.title,
-      description: item.description,
-      schoolName: item.schoolName,
-      groupName: item.groupName,
-      personName: item.personName,
-      isTeam: item.isTeam,
-      members: item.members,
-      images: item.images || [],
-      videos: item.videos || [],
-      urls: item.urls || [],
-      status: raw?.status || item.status,
-      submittedAt: raw?.submittedAt || item.submittedAt,
-      createdAt: raw?.createdAt || item.createdAt || item.created_at,
-      ownerId: raw?.ownerId || raw?.userId || item.ownerId || item.userId,
+      id: String(item?.id ?? raw?.id ?? raw?.uuid ?? ""),
+      title: item?.title ?? raw?.title,
+      description: item?.description ?? raw?.description,
+      schoolName,
+      groupName,
+      personName,
+      isTeam: item?.isTeam ?? raw?.isTeam ?? raw?.is_team ?? false,
+      members,
+      images,
+      videos,
+      urls,
+      status: item?.status ?? raw?.status,
+      createdAt: item?.createdAt ?? raw?.createdAt ?? raw?.created_at,
     };
   });
 
@@ -188,22 +225,39 @@ export async function updateAdminHomework(
   return (await res.json()) as AdminHomeworkRecord;
 }
 
-export async function deleteAdminHomeworks(ids: string[], token: string) {
-  await Promise.all(
-    ids.map(async (id) => {
+export async function deleteAdminHomeworks(
+  ids: string[],
+  token: string
+): Promise<{
+  deleted: string[];
+  failures: Array<{ id: string; message: string }>;
+}> {
+  const deleted: string[] = [];
+  const failures: Array<{ id: string; message: string }> = [];
+
+  for (const id of ids) {
+    try {
       const res = await fetch(`/api/homeworks/${encodeURIComponent(id)}`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
+
       if (!res.ok) {
         const text = await res.text();
         throw new Error(text || `HTTP ${res.status}`);
       }
-    })
-  );
-  return { deleted: ids };
+
+      deleted.push(id);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : String(error ?? "Unknown error");
+      failures.push({ id, message });
+    }
+  }
+
+  return { deleted, failures };
 }
 
 export async function updateAdminUser(

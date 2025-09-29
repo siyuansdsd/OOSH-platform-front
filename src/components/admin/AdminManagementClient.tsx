@@ -16,6 +16,7 @@ import {
   createTemporaryAccount,
   createEmployerAccount,
 } from "@/lib/api/admin";
+import { APPROVED_SCHOOLS } from "@/constants/schools";
 import { useAuth } from "@/components/auth/AuthProvider";
 
 interface EmployeeDraft {
@@ -56,7 +57,7 @@ export function AdminManagementClient() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [sortField, setSortField] =
-    useState<keyof AdminHomeworkRecord>("submittedAt");
+    useState<keyof AdminHomeworkRecord>("createdAt");
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc");
 
   const [tempAccount, setTempAccount] = useState({
@@ -74,6 +75,11 @@ export function AdminManagementClient() {
   const [creatingEmployers, setCreatingEmployers] = useState(false);
   const [bulkActionLoading, setBulkActionLoading] = useState<string | null>(
     null
+  );
+
+  const schoolOptions = useMemo(
+    () => [...APPROVED_SCHOOLS].sort((a, b) => a.localeCompare(b)),
+    []
   );
 
   useEffect(() => {
@@ -403,18 +409,42 @@ export function AdminManagementClient() {
       if (!accessToken) throw new Error("Not authenticated");
 
       if (view === "homeworks") {
-        // For homeworks, only delete is supported via this control
         if (action === "delete") {
-          // Optimistic update: remove items from cache
-          const updatedCache = homeworksCache.filter(
-            (item) => !selectedIds.includes(item.id)
+          const idsToDelete = [...selectedIds];
+          if (idsToDelete.length === 0) {
+            setError(null);
+            setSelectedIds([]);
+            return;
+          }
+
+          const lookup = new Map(
+            homeworksCache.map((record) => [record.id, record] as const)
           );
-          setHomeworksCache(updatedCache);
+          const { deleted, failures } = await deleteAdminHomeworks(
+            idsToDelete,
+            accessToken
+          );
 
-          // Call backend
-          await deleteAdminHomeworks(selectedIds, accessToken);
+          if (deleted.length > 0) {
+            setHomeworksCache((prev) =>
+              prev.filter((item) => !deleted.includes(item.id))
+            );
+          }
 
-          // No need to reconcile for deletions, optimistic update is final
+          if (failures.length > 0) {
+            const failureIds = failures.map((failure) => failure.id);
+            setSelectedIds(failureIds);
+            const messages = failures.map((failure) => {
+              const title = lookup.get(failure.id)?.title?.trim() || "Untitled";
+              return `${title}: delete failed (${failure.message})`;
+            });
+            setError(messages.join(" | "));
+          } else {
+            setSelectedIds([]);
+            setError(null);
+          }
+
+          return;
         }
       } else {
         // For users - optimistic updates
@@ -637,9 +667,6 @@ export function AdminManagementClient() {
         </div>
       </td>
       <td className="whitespace-nowrap px-3 py-3 text-sm text-foreground/70">
-        {record.submittedAt || "—"}
-      </td>
-      <td className="whitespace-nowrap px-3 py-3 text-sm text-foreground/70">
         {record.createdAt || "—"}
       </td>
       <td className="px-3 py-3 text-sm capitalize text-foreground/70">
@@ -785,7 +812,6 @@ export function AdminManagementClient() {
                 }
                 className="rounded-lg border border-foreground/20 bg-background/70 px-3 py-2 text-sm"
               >
-                <option value="submittedAt">Sort by Submitted</option>
                 <option value="createdAt">Sort by Created</option>
                 <option value="title">Sort by Title</option>
                 <option value="schoolName">Sort by School</option>
@@ -910,7 +936,6 @@ export function AdminManagementClient() {
                 <th className="px-3 py-3">Videos</th>
                 <th className="px-3 py-3">Images</th>
                 <th className="px-3 py-3">Websites</th>
-                <th className="px-3 py-3">Submitted</th>
                 <th className="px-3 py-3">Created</th>
                 <th className="px-3 py-3">Status</th>
               </tr>
@@ -941,7 +966,7 @@ export function AdminManagementClient() {
             {loading ? (
               <tr>
                 <td
-                  colSpan={view === "homeworks" ? 11 : 11}
+                  colSpan={view === "homeworks" ? 10 : 11}
                   className="px-3 py-6 text-center text-foreground/60"
                 >
                   Loading…
@@ -951,7 +976,7 @@ export function AdminManagementClient() {
                 .length === 0 ? (
               <tr>
                 <td
-                  colSpan={view === "homeworks" ? 11 : 11}
+                  colSpan={view === "homeworks" ? 10 : 11}
                   className="px-3 py-6 text-center text-foreground/60"
                 >
                   No records found.
@@ -1585,7 +1610,7 @@ export function AdminManagementClient() {
                 </label>
                 <label className="text-sm text-foreground/80">
                   School
-                  <input
+                  <select
                     value={editingHomework.schoolName || ""}
                     onChange={(e) =>
                       setEditing((prev) =>
@@ -1602,7 +1627,14 @@ export function AdminManagementClient() {
                       )
                     }
                     className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
-                  />
+                  >
+                    <option value="">Select a school</option>
+                    {schoolOptions.map((school) => (
+                      <option key={school} value={school}>
+                        {school}
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="text-sm text-foreground/80">
@@ -1673,65 +1705,18 @@ export function AdminManagementClient() {
                   />
                 </label>
 
-                <MediaEditor
+                <ReadOnlyMediaSection
                   label="Images"
-                  items={editingHomework.images}
-                  onRemove={(url) =>
-                    setEditing((prev) =>
-                      prev && prev.type === "homeworks"
-                        ? {
-                            type: "homeworks",
-                            original: prev.original,
-                            draft: {
-                              ...prev.draft,
-                              images: prev.draft.images.filter(
-                                (item) => item !== url
-                              ),
-                            },
-                          }
-                        : prev
-                    )
-                  }
+                  items={editingHomework.images || []}
+                  showPreview
                 />
-                <MediaEditor
+                <ReadOnlyMediaSection
                   label="Videos"
-                  items={editingHomework.videos}
-                  onRemove={(url) =>
-                    setEditing((prev) =>
-                      prev && prev.type === "homeworks"
-                        ? {
-                            type: "homeworks",
-                            original: prev.original,
-                            draft: {
-                              ...prev.draft,
-                              videos: prev.draft.videos.filter(
-                                (item) => item !== url
-                              ),
-                            },
-                          }
-                        : prev
-                    )
-                  }
+                  items={editingHomework.videos || []}
                 />
-                <MediaEditor
+                <ReadOnlyMediaSection
                   label="Websites"
-                  items={editingHomework.urls}
-                  onRemove={(url) =>
-                    setEditing((prev) =>
-                      prev && prev.type === "homeworks"
-                        ? {
-                            type: "homeworks",
-                            original: prev.original,
-                            draft: {
-                              ...prev.draft,
-                              urls: prev.draft.urls.filter(
-                                (item) => item !== url
-                              ),
-                            },
-                          }
-                        : prev
-                    )
-                  }
+                  items={editingHomework.urls || []}
                 />
               </div>
             ) : null}
@@ -2047,59 +2032,48 @@ export function AdminManagementClient() {
   );
 }
 
-function MediaEditor({
+function ReadOnlyMediaSection({
   label,
   items,
-  onRemove,
+  showPreview,
 }: {
   label: string;
   items: string[];
-  onRemove: (url: string) => void;
+  showPreview?: boolean;
 }) {
-  if (!items?.length) {
-    return (
-      <div className="space-y-2">
-        <div className="text-sm font-medium text-foreground">{label}</div>
-        <div className="text-sm text-foreground/60">No entries</div>
-      </div>
-    );
-  }
   return (
     <div className="space-y-2">
       <div className="text-sm font-medium text-foreground">{label}</div>
-      <div className="grid gap-2 md:grid-cols-2">
-        {items.map((url) => (
-          <div
-            key={url}
-            className="flex items-center gap-2 rounded-xl border border-foreground/15 bg-background/40 p-2"
-          >
-            {label === "Images" ? (
-              <img
-                src={url}
-                alt="preview"
-                className="h-16 w-16 rounded-lg object-cover"
-              />
-            ) : null}
-            <div className="flex-1 break-all text-sm">
-              <a
-                href={url}
-                className={`${linkClass} break-all`}
-                target="_blank"
-                rel="noreferrer"
-              >
-                {url}
-              </a>
-            </div>
-            <button
-              type="button"
-              onClick={() => onRemove(url)}
-              className="rounded-lg border border-foreground/20 px-2 py-1 text-xs text-red-500"
+      {items?.length ? (
+        <div className="grid gap-2 md:grid-cols-2">
+          {items.map((url) => (
+            <div
+              key={url}
+              className="flex items-center gap-2 rounded-xl border border-foreground/15 bg-background/40 p-2"
             >
-              Remove
-            </button>
-          </div>
-        ))}
-      </div>
+              {showPreview ? (
+                <img
+                  src={url}
+                  alt="preview"
+                  className="h-16 w-16 rounded-lg object-cover"
+                />
+              ) : null}
+              <div className="flex-1 break-all text-sm">
+                <a
+                  href={url}
+                  className={`${linkClass} break-all`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {url}
+                </a>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="text-sm text-foreground/60">No entries</div>
+      )}
     </div>
   );
 }
