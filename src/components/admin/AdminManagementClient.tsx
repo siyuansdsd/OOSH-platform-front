@@ -301,10 +301,21 @@ export function AdminManagementClient() {
   };
 
   const openHomeworkEditor = (record: AdminHomeworkRecord) => {
+    const hydratedMembers = record.isTeam
+      ? record.members && record.members.length > 0
+        ? [...record.members]
+        : [""]
+      : [];
+
     setEditing({
       type: "homeworks",
       original: record,
-      draft: { ...record, members: [...(record.members || [])] },
+      draft: {
+        ...record,
+        groupName: record.groupName ?? "",
+        personName: record.personName ?? "",
+        members: hydratedMembers,
+      },
     });
   };
 
@@ -329,22 +340,38 @@ export function AdminManagementClient() {
       if (!accessToken) throw new Error("Not authenticated");
 
       if (editing.type === "homeworks") {
-        // Optimistic update: immediately update cache
+        const rawMembers = editing.draft.members ?? [];
+        const sanitizedMembers = rawMembers
+          .map((member) => member.trim())
+          .filter((member) => member.length > 0);
+
+        const sanitizedDraft: AdminHomeworkRecord = {
+          ...editing.draft,
+          isTeam: Boolean(editing.draft.isTeam),
+          groupName: editing.draft.groupName?.trim() || "",
+          personName: editing.draft.personName?.trim() || "",
+          members: Boolean(editing.draft.isTeam) ? sanitizedMembers : [],
+        };
+
+        if (sanitizedDraft.isTeam && !sanitizedDraft.groupName) {
+          setError("Group name is required for team submissions");
+          setSaving(false);
+          return;
+        }
+
         const updatedCache = homeworksCache.map((item) =>
-          item.id === editing.draft.id ? editing.draft : item,
+          item.id === sanitizedDraft.id ? sanitizedDraft : item,
         );
         setHomeworksCache(updatedCache);
 
-        // Call backend
         const updatedRecord = await updateAdminHomework(
-          editing.draft.id,
-          editing.draft,
+          sanitizedDraft.id,
+          sanitizedDraft,
           accessToken,
         );
 
-        // Reconcile with backend response
         const reconciledCache = homeworksCache.map((item) =>
-          item.id === editing.draft.id ? updatedRecord : item,
+          item.id === sanitizedDraft.id ? updatedRecord : item,
         );
         setHomeworksCache(reconciledCache);
       } else {
@@ -814,7 +841,7 @@ export function AdminManagementClient() {
               >
                 <option value="createdAt">Sort by Created</option>
                 <option value="title">Sort by Title</option>
-                <option value="groupName">Sort by Team Name</option>
+                <option value="groupName">Sort by Group Name</option>
                 <option value="schoolName">Sort by School</option>
                 <option value="personName">Sort by Owner</option>
               </select>
@@ -946,7 +973,7 @@ export function AdminManagementClient() {
                 </th>
                 <th className="px-3 py-3">Title</th>
                 <th className="px-3 py-3">School</th>
-                <th className="px-3 py-3">Team Name</th>
+                <th className="px-3 py-3">Group Name</th>
                 <th className="px-3 py-3">Owner</th>
                 <th className="px-3 py-3">Members</th>
                 <th className="px-3 py-3">Videos</th>
@@ -1666,18 +1693,19 @@ export function AdminManagementClient() {
                         setEditing((prev) => {
                           if (!prev || prev.type !== "homeworks") return prev;
                           const checked = e.target.checked;
+                          const nextMembers = checked
+                            ? prev.draft.members &&
+                              prev.draft.members.length > 0
+                              ? prev.draft.members
+                              : [""]
+                            : [];
                           return {
                             type: "homeworks",
                             original: prev.original,
                             draft: {
                               ...prev.draft,
                               isTeam: checked,
-                              members: checked
-                                ? prev.draft.members &&
-                                  prev.draft.members.length > 0
-                                  ? prev.draft.members
-                                  : []
-                                : [],
+                              members: nextMembers,
                               personName: checked
                                 ? ""
                                 : prev.draft.personName || "",
@@ -1715,31 +1743,94 @@ export function AdminManagementClient() {
                         placeholder="Enter team name"
                       />
                     </label>
-                    <label className="text-sm text-foreground/80">
-                      Members (comma separated)
-                      <input
-                        value={(editingHomework.members || []).join(", ")}
-                        onChange={(e) =>
-                          setEditing((prev) =>
-                            prev && prev.type === "homeworks"
-                              ? {
-                                  type: "homeworks",
-                                  original: prev.original,
-                                  draft: {
-                                    ...prev.draft,
-                                    members: e.target.value
-                                      .split(",")
-                                      .map((part) => part.trim())
-                                      .filter(Boolean),
-                                  },
+                    <div className="space-y-2">
+                      <div className="text-sm text-foreground/80">Members</div>
+                      <div className="flex flex-col gap-2">
+                        {(editingHomework.members &&
+                        editingHomework.members.length > 0
+                          ? editingHomework.members
+                          : [""]
+                        ).map((member, index) => (
+                          <div key={index} className="flex items-center gap-2">
+                            <input
+                              value={member}
+                              onChange={(e) =>
+                                setEditing((prev) => {
+                                  if (!prev || prev.type !== "homeworks")
+                                    return prev;
+                                  const nextMembers = [
+                                    ...(prev.draft.members || []),
+                                  ];
+                                  if (nextMembers.length === 0)
+                                    nextMembers.push("");
+                                  nextMembers[index] = e.target.value;
+                                  return {
+                                    type: "homeworks",
+                                    original: prev.original,
+                                    draft: {
+                                      ...prev.draft,
+                                      members: nextMembers,
+                                    },
+                                  };
+                                })
+                              }
+                              className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
+                              placeholder={`Member ${index + 1}`}
+                            />
+                            {(editingHomework.members || []).length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEditing((prev) => {
+                                    if (!prev || prev.type !== "homeworks")
+                                      return prev;
+                                    const current = [
+                                      ...(prev.draft.members || []),
+                                    ];
+                                    if (current.length === 0) return prev;
+                                    current.splice(index, 1);
+                                    return {
+                                      type: "homeworks",
+                                      original: prev.original,
+                                      draft: {
+                                        ...prev.draft,
+                                        members: current.length
+                                          ? current
+                                          : [""],
+                                      },
+                                    };
+                                  })
                                 }
-                              : prev,
-                          )
+                                className="rounded-lg border border-foreground/20 px-2 py-1 text-xs"
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setEditing((prev) => {
+                            if (!prev || prev.type !== "homeworks") return prev;
+                            const nextMembers = [...(prev.draft.members || [])];
+                            nextMembers.push("");
+                            return {
+                              type: "homeworks",
+                              original: prev.original,
+                              draft: {
+                                ...prev.draft,
+                                members: nextMembers,
+                              },
+                            };
+                          })
                         }
-                        className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
-                        placeholder="Member names (comma separated)"
-                      />
-                    </label>
+                        className="rounded-lg border border-foreground/20 px-3 py-1 text-xs font-medium"
+                      >
+                        Add +
+                      </button>
+                    </div>
                   </>
                 ) : (
                   <label className="text-sm text-foreground/80">

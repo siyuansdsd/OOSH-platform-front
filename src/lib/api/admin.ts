@@ -117,6 +117,11 @@ const normalizeHomeworkRecord = (item: any): AdminHomeworkRecord => {
     toTrimmedString(raw.createdAt) ||
     toTrimmedString(raw.created_at);
 
+  const submittedAt =
+    toTrimmedString(item?.submittedAt) ||
+    toTrimmedString(raw.submittedAt) ||
+    toTrimmedString(raw.submitted_at);
+
   const status = toTrimmedString(item?.status) ?? toTrimmedString(raw.status);
 
   const isTeamValue =
@@ -135,6 +140,7 @@ const normalizeHomeworkRecord = (item: any): AdminHomeworkRecord => {
     videos,
     urls,
     status,
+    submittedAt,
     createdAt,
   };
 };
