@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   fetchAllAdminHomeworks,
   fetchAdminUsers,
@@ -36,9 +37,22 @@ type EditingItem =
   | { type: "users"; original: UserItem; draft: UserItem };
 
 const linkClass = "font-semibold italic underline";
+const handleAuthError = (
+  setErr: (msg: string) => void,
+  navigate: (path: string) => void,
+  role?: string,
+) => {
+  setErr("Session expired. Please sign in again.");
+  const target =
+    role && ["admin", "employee"].includes(role.toLowerCase())
+      ? "/adminmanagement"
+      : "/login";
+  setTimeout(() => navigate(target), 0);
+};
 
 export function AdminManagementClient() {
   const { accessToken, user } = useAuth();
+  const router = useRouter();
   const isEmployee = (user?.role || "").toLowerCase() === "employee";
   const [view, setView] = useState<ViewMode>("homeworks");
   const [homeworksCache, setHomeworksCache] = useState<AdminHomeworkRecord[]>(
@@ -81,6 +95,37 @@ export function AdminManagementClient() {
     () => [...APPROVED_SCHOOLS].sort((a, b) => a.localeCompare(b)),
     [],
   );
+
+  const getErrorMessage = (error: unknown): string => {
+    if (error instanceof Error) return error.message;
+    if (typeof error === "string") return error;
+    if (error && typeof error === "object" && "message" in error) {
+      const maybe = (error as { message?: unknown }).message;
+      if (typeof maybe === "string") return maybe;
+    }
+    return "";
+  };
+
+  const isAuthErrorMessage = (message: string) => {
+    if (!message) return false;
+    const lower = message.toLowerCase();
+    return (
+      lower.includes("401") ||
+      lower.includes("unauthorized") ||
+      lower.includes("forbidden") ||
+      lower.includes("not authenticated") ||
+      (lower.includes("token") && lower.includes("expired"))
+    );
+  };
+
+  const handleMaybeAuthError = (error: unknown) => {
+    const message = getErrorMessage(error);
+    if (isAuthErrorMessage(message)) {
+      handleAuthError(setError, router.replace, user?.role);
+      return true;
+    }
+    return false;
+  };
 
   useEffect(() => {
     // Redirect employee users away from users view
@@ -133,8 +178,9 @@ export function AdminManagementClient() {
             : [];
         setUsers(list as UserItem[]);
       }
-    } catch (err: any) {
-      setError(err?.message || "Failed to load data");
+    } catch (err: unknown) {
+      if (handleMaybeAuthError(err)) return;
+      setError(getErrorMessage(err) || "Failed to load data");
     } finally {
       setLoading(false);
       setSelectedIds([]);
@@ -150,8 +196,9 @@ export function AdminManagementClient() {
       const res = await fetchAllAdminHomeworks(accessToken);
       setHomeworksCache(res.items);
       setHomeworksCacheLoaded(true);
-    } catch (err: any) {
-      setError(err?.message || "Failed to refresh homework data");
+    } catch (err: unknown) {
+      if (handleMaybeAuthError(err)) return;
+      setError(getErrorMessage(err) || "Failed to refresh homework data");
     } finally {
       setLoading(false);
     }
@@ -194,8 +241,9 @@ export function AdminManagementClient() {
 
         return [...keepUsers, ...refreshedUsers];
       });
-    } catch (err: any) {
-      setError(err?.message || "Failed to refresh data");
+    } catch (err: unknown) {
+      if (handleMaybeAuthError(err)) return;
+      setError(getErrorMessage(err) || "Failed to refresh data");
     }
   }
 
@@ -410,14 +458,15 @@ export function AdminManagementClient() {
         setUsers(reconciledUsers);
       }
       setEditing(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Rollback optimistic updates on error
       if (editing.type === "homeworks") {
         setHomeworksCache(originalHomeworksCache);
       } else {
         setUsers(originalUsers);
       }
-      setError(err?.message || "Update failed");
+      if (handleMaybeAuthError(err)) return;
+      setError(getErrorMessage(err) || "Update failed");
     } finally {
       setSaving(false);
     }
@@ -508,14 +557,15 @@ export function AdminManagementClient() {
       }
 
       setSelectedIds([]);
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Rollback optimistic updates on error
       if (view === "homeworks") {
         setHomeworksCache(originalHomeworksCache);
       } else {
         setUsers(originalUsers);
       }
-      setError(err?.message || "Action failed");
+      if (handleMaybeAuthError(err)) return;
+      setError(getErrorMessage(err) || "Action failed");
     } finally {
       setBulkActionLoading(null);
     }
@@ -529,8 +579,9 @@ export function AdminManagementClient() {
       await createTemporaryAccount(tempAccount, accessToken);
       await loadData("users");
       setTempAccount({ username: "", password: "" });
-    } catch (err: any) {
-      setError(err?.message || "Create failed");
+    } catch (err: unknown) {
+      if (handleMaybeAuthError(err)) return;
+      setError(getErrorMessage(err) || "Create failed");
     } finally {
       setCreatingTemp(false);
     }
@@ -572,8 +623,9 @@ export function AdminManagementClient() {
       for (const acct of accounts) {
         try {
           await createEmployerAccount(acct, accessToken);
-        } catch (err: any) {
-          const msg = err?.message || "Create failed for an account";
+        } catch (err: unknown) {
+          if (handleMaybeAuthError(err)) throw err;
+          const msg = getErrorMessage(err) || "Create failed for an account";
           setError(`Failed to create ${acct.email || acct.username}: ${msg}`);
           throw err;
         }
@@ -583,8 +635,9 @@ export function AdminManagementClient() {
       setEmployerDrafts([
         { display_name: "", email: "", password: "", username: "" },
       ]);
-    } catch (err: any) {
-      if (!error) setError(err?.message || "Batch create failed");
+    } catch (err: unknown) {
+      if (handleMaybeAuthError(err)) return;
+      if (!error) setError(getErrorMessage(err) || "Batch create failed");
     } finally {
       setCreatingEmployers(false);
     }
@@ -1423,9 +1476,11 @@ export function AdminManagementClient() {
                                   accessToken,
                                 );
                                 await refreshSpecificUsers("temporary");
-                              } catch (err: any) {
+                              } catch (err: unknown) {
+                                if (handleMaybeAuthError(err)) return;
                                 setError(
-                                  err?.message || "Block/Unblock failed",
+                                  getErrorMessage(err) ||
+                                    "Block/Unblock failed",
                                 );
                               } finally {
                                 setBlockingIds((prev) =>
@@ -1457,8 +1512,11 @@ export function AdminManagementClient() {
                                 setBlockingIds((prev) => [...prev, user.id]);
                                 await deleteAdminUser(user.id, accessToken);
                                 await refreshSpecificUsers("temporary");
-                              } catch (err: any) {
-                                setError(err?.message || "Delete failed");
+                              } catch (err: unknown) {
+                                if (handleMaybeAuthError(err)) return;
+                                setError(
+                                  getErrorMessage(err) || "Delete failed",
+                                );
                               } finally {
                                 setBlockingIds((prev) =>
                                   prev.filter((id) => id !== user.id),
@@ -1540,9 +1598,11 @@ export function AdminManagementClient() {
                                   accessToken,
                                 );
                                 await refreshSpecificUsers("employee");
-                              } catch (err: any) {
+                              } catch (err: unknown) {
+                                if (handleMaybeAuthError(err)) return;
                                 setError(
-                                  err?.message || "Block/Unblock failed",
+                                  getErrorMessage(err) ||
+                                    "Block/Unblock failed",
                                 );
                               } finally {
                                 setBlockingIds((prev) =>
@@ -1574,8 +1634,11 @@ export function AdminManagementClient() {
                                 setBlockingIds((prev) => [...prev, user.id]);
                                 await deleteAdminUser(user.id, accessToken);
                                 await refreshSpecificUsers("employee");
-                              } catch (err: any) {
-                                setError(err?.message || "Delete failed");
+                              } catch (err: unknown) {
+                                if (handleMaybeAuthError(err)) return;
+                                setError(
+                                  getErrorMessage(err) || "Delete failed",
+                                );
                               } finally {
                                 setBlockingIds((prev) =>
                                   prev.filter((id) => id !== user.id),
