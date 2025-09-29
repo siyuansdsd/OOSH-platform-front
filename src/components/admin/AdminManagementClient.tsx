@@ -103,6 +103,7 @@ export function AdminManagementClient() {
     password: "",
   });
   const [creatingTemp, setCreatingTemp] = useState(false);
+  const [tempFormError, setTempFormError] = useState<string | null>(null);
 
   interface EmployeeDraftInternal extends EmployeeDraft {
     username?: string;
@@ -115,11 +116,26 @@ export function AdminManagementClient() {
     null,
   );
   const [standardUsersLoaded, setStandardUsersLoaded] = useState(false);
+  const [employerFormError, setEmployerFormError] = useState<string | null>(
+    null,
+  );
 
   const schoolOptions = useMemo(
     () => [...APPROVED_SCHOOLS].sort((a, b) => a.localeCompare(b)),
     [],
   );
+
+  useEffect(() => {
+    if (!tempFormError) return;
+    const id = window.setTimeout(() => setTempFormError(null), 4000);
+    return () => window.clearTimeout(id);
+  }, [tempFormError]);
+
+  useEffect(() => {
+    if (!employerFormError) return;
+    const id = window.setTimeout(() => setEmployerFormError(null), 4000);
+    return () => window.clearTimeout(id);
+  }, [employerFormError]);
   const handleMaybeAuthError = useCallback(
     (error: unknown) => {
       const message = getErrorMessage(error);
@@ -619,9 +635,11 @@ export function AdminManagementClient() {
       const created = await createTemporaryAccount(tempAccount, accessToken);
       setTemporaryUsers((prev) => [...prev, created]);
       setTempAccount({ username: "", password: "" });
+      setTempFormError(null);
     } catch (err: unknown) {
       if (handleMaybeAuthError(err)) return;
-      setError(getErrorMessage(err) || "Create failed");
+      const message = getErrorMessage(err) || "Create failed";
+      setTempFormError(message);
     } finally {
       setCreatingTemp(false);
     }
@@ -637,7 +655,7 @@ export function AdminManagementClient() {
       }))
       .filter((draft) => draft.display_name && draft.email && draft.password);
     if (accounts.length === 0) {
-      setError(
+      setEmployerFormError(
         "Please provide at least one row with display name, email and password.",
       );
       return;
@@ -650,7 +668,7 @@ export function AdminManagementClient() {
         "Invalid employer accounts (missing username/password):",
         invalid,
       );
-      setError(
+      setEmployerFormError(
         "One or more accounts are missing username or password. Email will be used as username if provided.",
       );
       return;
@@ -668,20 +686,23 @@ export function AdminManagementClient() {
         } catch (err: unknown) {
           if (handleMaybeAuthError(err)) throw err;
           const msg = getErrorMessage(err) || "Create failed for an account";
-          setError(`Failed to create ${acct.email || acct.username}: ${msg}`);
+          setEmployerFormError(
+            `Failed to create ${acct.email || acct.username}: ${msg}`,
+          );
           throw err;
         }
       }
 
       if (createdUsers.length > 0) {
         setEmployeeUsers((prev) => [...prev, ...createdUsers]);
+        setEmployerFormError(null);
       }
       setEmployerDrafts([
         { display_name: "", email: "", password: "", username: "" },
       ]);
     } catch (err: unknown) {
       if (handleMaybeAuthError(err)) return;
-      if (!error) setError(getErrorMessage(err) || "Batch create failed");
+      setEmployerFormError(getErrorMessage(err) || "Batch create failed");
     } finally {
       setCreatingEmployers(false);
     }
@@ -1281,14 +1302,14 @@ export function AdminManagementClient() {
 
       {view === "users" && !isEmployee && (
         <section className="grid gap-6 lg:grid-cols-2">
-          <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6">
+          <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6 min-h-[280px] flex flex-col gap-4">
             <h2 className="text-lg font-semibold text-foreground">
               Temporary accounts
             </h2>
             <p className="mt-1 text-sm text-foreground/60">
               Quickly generate temporary login credentials.
             </p>
-            <div className="mt-4 grid gap-3">
+            <div className="grid flex-1 gap-3">
               <label className="text-sm text-foreground/80">
                 Username
                 <input
@@ -1316,86 +1337,96 @@ export function AdminManagementClient() {
                   type="password"
                 />
               </label>
-              <button
-                type="button"
-                onClick={handleCreateTemporary}
-                disabled={creatingTemp}
-                className="mt-2 inline-flex w-fit items-center justify-center rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {creatingTemp ? "Creating…" : "Create temporary account"}
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleCreateTemporary}
+                  disabled={creatingTemp}
+                  className="inline-flex w-fit items-center justify-center rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {creatingTemp ? "Creating…" : "Create temporary account"}
+                </button>
+                {tempFormError ? (
+                  <span className="text-xs text-red-500">{tempFormError}</span>
+                ) : null}
+              </div>
             </div>
           </div>
 
-          <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6">
+          <div className="rounded-3xl border border-foreground/10 bg-white/5 p-6 min-h-[360px] flex flex-col gap-4">
             <h2 className="text-lg font-semibold text-foreground">
               Employee invitations
             </h2>
             <p className="mt-1 text-sm text-foreground/60">
               Add employee accounts in bulk by display name, email and password.
             </p>
-            <div className="mt-4 space-y-3">
-              {employerDrafts.map((draft, index) => (
-                <div
-                  key={
-                    draft.email || draft.username || draft.display_name || index
-                  }
-                  className="grid gap-3 sm:grid-cols-3"
-                >
-                  <label className="text-sm text-foreground/80">
-                    Display Name
-                    <input
-                      value={draft.display_name}
-                      onChange={(e) => {
-                        const next = [...employerDrafts];
-                        next[index] = {
-                          ...next[index],
-                          display_name: e.target.value,
-                        };
-                        setEmployerDrafts(next);
-                      }}
-                      className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
-                    />
-                  </label>
-                  <label className="text-sm text-foreground/80">
-                    Email
-                    <input
-                      value={draft.email}
-                      onChange={(e) => {
-                        const next = [...employerDrafts];
-                        const emailVal = e.target.value;
-                        next[index] = {
-                          ...next[index],
-                          email: emailVal,
-                          username: emailVal,
-                        };
-                        setEmployerDrafts(next);
-                      }}
-                      className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
-                      type="email"
-                    />
-                    <div className="mt-1 text-xs text-foreground/60">
-                      Email will be used as the username
-                    </div>
-                  </label>
-                  <label className="text-sm text-foreground/80">
-                    Password
-                    <input
-                      value={draft.password}
-                      onChange={(e) => {
-                        const next = [...employerDrafts];
-                        next[index] = {
-                          ...next[index],
-                          password: e.target.value,
-                        };
-                        setEmployerDrafts(next);
-                      }}
-                      className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
-                      type="password"
-                    />
-                  </label>
-                </div>
-              ))}
+            <div className="mt-2 flex-1 space-y-3">
+              <div className="max-h-64 overflow-y-auto pr-2 space-y-3">
+                {employerDrafts.map((draft, index) => (
+                  <div
+                    key={
+                      draft.email ||
+                      draft.username ||
+                      draft.display_name ||
+                      index
+                    }
+                    className="grid gap-3 sm:grid-cols-3"
+                  >
+                    <label className="text-sm text-foreground/80">
+                      Display Name
+                      <input
+                        value={draft.display_name}
+                        onChange={(e) => {
+                          const next = [...employerDrafts];
+                          next[index] = {
+                            ...next[index],
+                            display_name: e.target.value,
+                          };
+                          setEmployerDrafts(next);
+                        }}
+                        className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
+                      />
+                    </label>
+                    <label className="text-sm text-foreground/80">
+                      Email
+                      <input
+                        value={draft.email}
+                        onChange={(e) => {
+                          const next = [...employerDrafts];
+                          const emailVal = e.target.value;
+                          next[index] = {
+                            ...next[index],
+                            email: emailVal,
+                            username: emailVal,
+                          };
+                          setEmployerDrafts(next);
+                        }}
+                        className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
+                        type="email"
+                      />
+                      <div className="mt-1 text-xs text-foreground/60">
+                        Email will be used as the username
+                      </div>
+                    </label>
+                    <label className="text-sm text-foreground/80">
+                      Password
+                      <input
+                        value={draft.password}
+                        onChange={(e) => {
+                          const next = [...employerDrafts];
+                          next[index] = {
+                            ...next[index],
+                            password: e.target.value,
+                          };
+                          setEmployerDrafts(next);
+                        }}
+                        className="mt-1 w-full rounded-lg border border-foreground/15 bg-background/60 px-3 py-2"
+                        type="password"
+                      />
+                    </label>
+                  </div>
+                ))}
+              </div>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
@@ -1423,20 +1454,29 @@ export function AdminManagementClient() {
                   </button>
                 ) : null}
               </div>
-              <button
-                type="button"
-                onClick={handleCreateEmployers}
-                disabled={
-                  creatingEmployers ||
-                  !employerDrafts.some(
-                    (d) =>
-                      d.display_name.trim() && d.email.trim() && d.password,
-                  )
-                }
-                className="inline-flex w-fit items-center justify-center rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {creatingEmployers ? "Processing…" : "Create employee accounts"}
-              </button>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleCreateEmployers}
+                  disabled={
+                    creatingEmployers ||
+                    !employerDrafts.some(
+                      (d) =>
+                        d.display_name.trim() && d.email.trim() && d.password,
+                    )
+                  }
+                  className="inline-flex w-fit items-center justify-center rounded-lg bg-foreground px-4 py-2 text-sm font-medium text-background disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {creatingEmployers
+                    ? "Processing…"
+                    : "Create employee accounts"}
+                </button>
+                {employerFormError ? (
+                  <span className="text-xs text-red-500">
+                    {employerFormError}
+                  </span>
+                ) : null}
+              </div>
             </div>
           </div>
         </section>
