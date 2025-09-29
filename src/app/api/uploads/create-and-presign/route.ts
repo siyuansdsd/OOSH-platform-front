@@ -6,7 +6,7 @@ export async function POST(req: Request) {
     if (!base) {
       return NextResponse.json(
         { message: "Server not configured (API_BASE)" },
-        { status: 500 }
+        { status: 500 },
       );
     }
     const contentType = req.headers.get("content-type") || "";
@@ -25,7 +25,7 @@ export async function POST(req: Request) {
       });
     } else {
       // File mode: forward multipart/form-data as-is
-      res = await fetch(`${base}/api/uploads/create-and-presign`, {
+      const uploadInit: RequestInit & { duplex: "half" } = {
         method: "POST",
         headers: contentType
           ? {
@@ -36,9 +36,9 @@ export async function POST(req: Request) {
             ? { Authorization: authHeader }
             : undefined,
         body: req.body,
-        // req.body is a ReadableStream; undici requires duplex: 'half'
-        duplex: "half" as any,
-      } as any);
+        duplex: "half",
+      };
+      res = await fetch(`${base}/api/uploads/create-and-presign`, uploadInit);
     }
     const text = await res.text();
     const ctype = res.headers.get("content-type") || "";
@@ -50,7 +50,7 @@ export async function POST(req: Request) {
       });
     }
     // Try to normalize to a stable shape: { homeworkId, presigns: [...] }
-    let data: any;
+    let data: unknown;
     try {
       data = text ? JSON.parse(text) : {};
     } catch {
@@ -60,27 +60,47 @@ export async function POST(req: Request) {
       });
     }
 
-    const pickFirst = (...vals: any[]) =>
-      vals.find((v) => v !== undefined && v !== null);
-    const roots = [data, data?.data, data?.result, data?.payload];
-    const getFromRoots = (key: string) =>
-      pickFirst(
-        ...roots.map((r) =>
-          r && typeof r === "object" ? (r as any)[key] : undefined
-        )
-      );
+    const pickFirst = <T>(
+      ...vals: Array<T | null | undefined>
+    ): T | undefined =>
+      vals.find((value) => value !== undefined && value !== null);
 
-    const homeworkObj = pickFirst(getFromRoots("homework"));
+    type UnknownRecord = Record<string, unknown>;
+    const asRecord = (value: unknown): UnknownRecord | null =>
+      value && typeof value === "object" && !Array.isArray(value)
+        ? (value as UnknownRecord)
+        : null;
+
+    const roots: unknown[] = [];
+    const addRoot = (value: unknown) => {
+      if (value !== undefined && value !== null) roots.push(value);
+    };
+
+    addRoot(data);
+    const extract = (value: unknown, key: string): unknown => {
+      const record = asRecord(value);
+      if (!record) return undefined;
+      return record[key];
+    };
+
+    addRoot(extract(data, "data"));
+    addRoot(extract(data, "result"));
+    addRoot(extract(data, "payload"));
+
+    const getFromRoots = (key: string): unknown =>
+      pickFirst(...roots.map((root) => extract(root, key)));
+
+    const homeworkObj = asRecord(getFromRoots("homework"));
     const homeworkId = pickFirst(
       getFromRoots("homeworkId"),
       getFromRoots("homework_id"),
-      homeworkObj?.id,
-      getFromRoots("id")
+      extract(homeworkObj, "id"),
+      getFromRoots("id"),
     );
 
-    const looksLikePresign = (o: any) =>
-      o &&
-      typeof o === "object" &&
+    const looksLikePresign = (value: unknown): value is UnknownRecord =>
+      !!value &&
+      typeof value === "object" &&
       [
         "uploadUrl",
         "presignedUrl",
@@ -90,16 +110,16 @@ export async function POST(req: Request) {
         "location",
         "filename",
         "contentType",
-      ].some((k) => k in o);
+      ].some((key) => key in (value as UnknownRecord));
 
-    const toArray = (v: any): any[] => {
-      if (!v) return [];
-      if (Array.isArray(v)) return v;
-      if (typeof v === "object") return Object.values(v);
-      return [v];
+    const toArray = (input: unknown): unknown[] => {
+      if (!input) return [];
+      if (Array.isArray(input)) return input;
+      if (typeof input === "object") return Object.values(input);
+      return [input];
     };
 
-    let presigns: any = pickFirst(
+    const presigns = pickFirst(
       getFromRoots("presigns"),
       getFromRoots("presign"),
       getFromRoots("signed"),
@@ -107,7 +127,7 @@ export async function POST(req: Request) {
       getFromRoots("signed_urls"),
       getFromRoots("files"),
       getFromRoots("file"),
-      getFromRoots("items")
+      getFromRoots("items"),
     );
     let presignsArr = toArray(presigns);
     if (presignsArr.length === 0) {
@@ -116,15 +136,15 @@ export async function POST(req: Request) {
       if (looksLikePresign(d)) presignsArr = [d];
     }
     if (presignsArr.length === 0) {
-      const candidate = roots.find((r) => looksLikePresign(r));
-      if (candidate) presignsArr = [candidate as any];
+      const candidate = roots.find((value) => looksLikePresign(value));
+      if (candidate) presignsArr = [candidate];
     }
     if (presignsArr.length === 0) {
-      const arrayRoot = roots.find((r) => Array.isArray(r)) as
-        | any[]
+      const arrayRoot = roots.find((value) => Array.isArray(value)) as
+        | unknown[]
         | undefined;
-      if (arrayRoot && arrayRoot.some((it) => looksLikePresign(it))) {
-        presignsArr = arrayRoot.filter((it) => looksLikePresign(it));
+      if (arrayRoot?.some((item) => looksLikePresign(item))) {
+        presignsArr = arrayRoot.filter((item) => looksLikePresign(item));
       }
     }
 
@@ -141,12 +161,10 @@ export async function POST(req: Request) {
         homeworkId,
         presigns: presignsArr,
       },
-      { status: res.status }
+      { status: res.status },
     );
-  } catch (e: any) {
-    return NextResponse.json(
-      { message: e?.message || "Proxy failed" },
-      { status: 500 }
-    );
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : "Proxy failed";
+    return NextResponse.json({ message }, { status: 500 });
   }
 }
