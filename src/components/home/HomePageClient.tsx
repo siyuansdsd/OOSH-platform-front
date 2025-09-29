@@ -61,7 +61,6 @@ export function HomePageClient() {
   const abortRef = useRef<AbortController | null>(null);
   const mediaCacheRef = useRef<Map<string, CacheEntry>>(new Map());
   const websiteCacheRef = useRef<Map<string, CacheEntry>>(new Map());
-  const allCacheRef = useRef<Map<string, CacheEntry>>(new Map());
 
   const buildCacheKey = useCallback((filters: Filters) => {
     const school = filters.school.trim().toLowerCase();
@@ -93,11 +92,7 @@ export function HomePageClient() {
 
       const cacheKey = buildCacheKey(filters);
       const cacheMap =
-        type === "website"
-          ? websiteCacheRef.current
-          : type === "media"
-            ? mediaCacheRef.current
-            : allCacheRef.current;
+        type === "website" ? websiteCacheRef.current : mediaCacheRef.current;
       const cachedEntry = cacheMap.get(cacheKey);
 
       if (!append && !ignoreCache && cachedEntry) {
@@ -137,8 +132,6 @@ export function HomePageClient() {
         } else {
           if (type === "media") {
             commonParams.category = "media";
-          } else if (type === "all") {
-            commonParams.category = "all";
           }
           result = await fetchHomeworks(commonParams, accessToken);
         }
