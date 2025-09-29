@@ -80,6 +80,32 @@ export function HomePageClient() {
 
   const availableSchools = useMemo(() => [...APPROVED_SCHOOLS], []);
 
+  const resolveCacheType = useCallback(
+    (type: FilterValue) => (type === "website" ? "website" : "media"),
+    [],
+  );
+
+  const syncFromCache = useCallback(
+    (filters: Filters, type: FilterValue) => {
+      const cacheMap =
+        resolveCacheType(type) === "website"
+          ? websiteCacheRef.current
+          : mediaCacheRef.current;
+      const cached = cacheMap.get(buildCacheKey(filters));
+      if (!cached) return false;
+      setItems(cached.items);
+      setPage(cached.page);
+      setHasMore(cached.hasMore);
+      setServerTotal(cached.total);
+      setServerHasMore(cached.hasMore);
+      setLoading(false);
+      setLoadingMore(false);
+      setError(null);
+      return true;
+    },
+    [buildCacheKey, resolveCacheType],
+  );
+
   const runFetch = useCallback(
     async ({
       filters,
@@ -92,7 +118,9 @@ export function HomePageClient() {
 
       const cacheKey = buildCacheKey(filters);
       const cacheMap =
-        type === "website" ? websiteCacheRef.current : mediaCacheRef.current;
+        resolveCacheType(type) === "website"
+          ? websiteCacheRef.current
+          : mediaCacheRef.current;
       const cachedEntry = cacheMap.get(cacheKey);
 
       if (!append && !ignoreCache && cachedEntry) {
@@ -130,16 +158,14 @@ export function HomePageClient() {
         if (type === "website") {
           result = await fetchHomeworksWithUrls(commonParams, accessToken);
         } else {
-          if (type === "media") {
-            commonParams.category = "media";
-          }
+          commonParams.category = "media";
           result = await fetchHomeworks(commonParams, accessToken);
         }
 
         if (controller.signal.aborted) return;
 
         let normalizedItems = result.items;
-        if (type === "media") {
+        if (resolveCacheType(type) === "media") {
           normalizedItems = normalizedItems.filter((item) => item.hasMedia);
         } else if (type === "website") {
           normalizedItems = normalizedItems.filter((item) => item.hasWebsite);
@@ -200,15 +226,17 @@ export function HomePageClient() {
         }
       }
     },
-    [accessToken, buildCacheKey],
+    [accessToken, buildCacheKey, resolveCacheType],
   );
 
   const handleSearch = () => {
-    setActiveFilters({ ...formFilters });
+    const nextFilters = { ...formFilters };
+    setActiveFilters(nextFilters);
     setPage(1);
     setHasMore(false);
     setServerHasMore(null);
     setError(null);
+    syncFromCache(nextFilters, typeFilter);
   };
 
   const handleTypeChange = (next: FilterValue) => {
@@ -217,6 +245,7 @@ export function HomePageClient() {
     setHasMore(false);
     setServerHasMore(null);
     setError(null);
+    syncFromCache(activeFilters, next);
   };
 
   const handleRefresh = () => {
@@ -280,11 +309,9 @@ export function HomePageClient() {
   }, [items, activeFilters]);
 
   const displayItems = useMemo(() => {
-    if (typeFilter === "media")
-      return filteredBySearch.filter((item) => item.hasMedia);
     if (typeFilter === "website")
       return filteredBySearch.filter((item) => item.hasWebsite);
-    return filteredBySearch;
+    return filteredBySearch.filter((item) => item.hasMedia);
   }, [filteredBySearch, typeFilter]);
 
   return (
