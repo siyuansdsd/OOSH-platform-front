@@ -71,61 +71,67 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
     ? (value as Record<string, unknown>)
     : null;
 
-const normalizeHomeworkRecord = (item: any): AdminHomeworkRecord => {
-  const raw = asRecord(item?.raw) ?? asRecord(item) ?? {};
+const normalizeHomeworkRecord = (item: unknown): AdminHomeworkRecord => {
+  const source = asRecord(item);
+  const raw = asRecord(source?.raw) ?? source ?? {};
 
   const id =
-    toTrimmedString(item?.id) ||
+    toTrimmedString(source?.id) ||
     toTrimmedString(raw.id) ||
     toTrimmedString(raw.uuid) ||
     toTrimmedString(raw.homeworkId) ||
     "";
 
-  const title = toTrimmedString(item?.title) ?? toTrimmedString(raw.title);
+  const title = toTrimmedString(source?.title) ?? toTrimmedString(raw.title);
   const description =
-    toTrimmedString(item?.description) ?? toTrimmedString(raw.description);
+    toTrimmedString(source?.description) ?? toTrimmedString(raw.description);
   const schoolName =
-    toTrimmedString(item?.schoolName) ||
+    toTrimmedString(source?.schoolName) ||
     toTrimmedString(raw.schoolName) ||
     toTrimmedString(raw.school_name) ||
     toTrimmedString(raw.school) ||
     toTrimmedString(raw.schoolname);
   const groupName =
-    toTrimmedString(item?.groupName) ||
+    toTrimmedString(source?.groupName) ||
     toTrimmedString(raw.groupName) ||
     toTrimmedString(raw.group_name) ||
     toTrimmedString(raw.team_name);
   const personName =
-    toTrimmedString(item?.personName) ||
+    toTrimmedString(source?.personName) ||
     toTrimmedString(raw.personName) ||
     toTrimmedString(raw.person_name) ||
     toTrimmedString(raw.student_name);
 
-  const membersSource = item?.members ?? raw.members;
+  const membersSource = source?.members ?? raw.members;
   const members = Array.isArray(membersSource)
     ? membersSource
         .map((entry: unknown) => toTrimmedString(entry))
         .filter((entry): entry is string => Boolean(entry))
     : [];
 
-  const images = toStringArray(item?.images ?? raw.images);
-  const videos = toStringArray(item?.videos ?? raw.videos);
-  const urls = toStringArray(item?.urls ?? raw.urls);
+  const images = toStringArray(source?.images ?? raw.images);
+  const videos = toStringArray(source?.videos ?? raw.videos);
+  const urls = toStringArray(source?.urls ?? raw.urls);
 
   const createdAt =
-    toTrimmedString(item?.createdAt) ||
+    toTrimmedString(source?.createdAt) ||
     toTrimmedString(raw.createdAt) ||
     toTrimmedString(raw.created_at);
 
   const submittedAt =
-    toTrimmedString(item?.submittedAt) ||
+    toTrimmedString(source?.submittedAt) ||
     toTrimmedString(raw.submittedAt) ||
     toTrimmedString(raw.submitted_at);
 
-  const status = toTrimmedString(item?.status) ?? toTrimmedString(raw.status);
+  const status = toTrimmedString(source?.status) ?? toTrimmedString(raw.status);
 
   const isTeamValue =
-    item?.isTeam ?? raw.isTeam ?? raw.is_team ?? raw.team ?? raw.group ?? false;
+    source?.isTeam ??
+    raw.isTeam ??
+    raw.is_team ??
+    raw.team ??
+    raw.group ??
+    false;
 
   return {
     id,
@@ -167,7 +173,7 @@ export async function fetchAdminHomeworks(
 ) {
   const res = await fetchHomeworks(params, token);
   const items: AdminHomeworkRecord[] = res.items.map((item: HomeworkRecord) => {
-    const raw = item.raw as Record<string, any> | undefined;
+    const raw = item.raw as Record<string, unknown> | undefined;
     return {
       id: item.id,
       title: item.title,
@@ -194,7 +200,7 @@ export async function fetchAdminHomeworks(
 }
 
 export async function fetchAllAdminHomeworks(token: string) {
-  const res = await send<{ items: any[]; total: number; limit: number }>(
+  const res = await send<{ items: unknown[]; total: number; limit: number }>(
     `/api/homeworks/admin/all`,
     {
       headers: {
@@ -428,9 +434,7 @@ export async function updateCurrentUser(
         Authorization: `Bearer ${token}`,
       },
     });
-  } catch (error: any) {
-    // If we get a 403, it might be due to scope/permission issues
-    // The backend might be expecting a different request format or scope
+  } catch (error: unknown) {
     console.error("updateCurrentUser failed:", error);
     throw error;
   }

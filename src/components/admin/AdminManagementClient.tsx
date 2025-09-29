@@ -1,24 +1,24 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  fetchAllAdminHomeworks,
-  fetchAdminUsers,
-  type AdminHomeworkRecord,
-  type UserItem,
-  type Role,
-  updateAdminHomework,
-  deleteAdminHomeworks,
-  updateAdminUser,
-  blockAdminUser,
-  deleteAdminUser,
-  bulkUpdateAdminUsers,
-  createTemporaryAccount,
-  createEmployerAccount,
-} from "@/lib/api/admin";
-import { APPROVED_SCHOOLS } from "@/constants/schools";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { APPROVED_SCHOOLS } from "@/constants/schools";
+import {
+  type AdminHomeworkRecord,
+  blockAdminUser,
+  bulkUpdateAdminUsers,
+  createEmployerAccount,
+  createTemporaryAccount,
+  deleteAdminHomeworks,
+  deleteAdminUser,
+  fetchAdminUsers,
+  fetchAllAdminHomeworks,
+  type Role,
+  type UserItem,
+  updateAdminHomework,
+  updateAdminUser,
+} from "@/lib/api/admin";
 
 interface EmployeeDraft {
   display_name: string;
@@ -50,6 +50,28 @@ const handleAuthError = (
   setTimeout(() => navigate(target), 0);
 };
 
+const getErrorMessage = (error: unknown): string => {
+  if (error instanceof Error) return error.message;
+  if (typeof error === "string") return error;
+  if (error && typeof error === "object") {
+    const maybe = (error as { message?: unknown }).message;
+    if (typeof maybe === "string") return maybe;
+  }
+  return "";
+};
+
+const isAuthErrorMessage = (message: string): boolean => {
+  if (!message) return false;
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("401") ||
+    lower.includes("unauthorized") ||
+    lower.includes("forbidden") ||
+    lower.includes("not authenticated") ||
+    (lower.includes("token") && lower.includes("expired"))
+  );
+};
+
 export function AdminManagementClient() {
   const { accessToken, user } = useAuth();
   const router = useRouter();
@@ -60,6 +82,8 @@ export function AdminManagementClient() {
   );
   const [homeworksCacheLoaded, setHomeworksCacheLoaded] = useState(false);
   const [users, setUsers] = useState<UserItem[]>([]);
+  const [temporaryUsers, setTemporaryUsers] = useState<UserItem[]>([]);
+  const [employerUsers, setEmployeeUsers] = useState<UserItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -90,42 +114,70 @@ export function AdminManagementClient() {
   const [bulkActionLoading, setBulkActionLoading] = useState<string | null>(
     null,
   );
+  const [standardUsersLoaded, setStandardUsersLoaded] = useState(false);
 
   const schoolOptions = useMemo(
     () => [...APPROVED_SCHOOLS].sort((a, b) => a.localeCompare(b)),
     [],
   );
+  const handleMaybeAuthError = useCallback(
+    (error: unknown) => {
+      const message = getErrorMessage(error);
+      if (isAuthErrorMessage(message)) {
+        handleAuthError(setError, router.replace, user?.role);
+        return true;
+      }
+      return false;
+    },
+    [router, user?.role],
+  );
 
-  const getErrorMessage = (error: unknown): string => {
-    if (error instanceof Error) return error.message;
-    if (typeof error === "string") return error;
-    if (error && typeof error === "object" && "message" in error) {
-      const maybe = (error as { message?: unknown }).message;
-      if (typeof maybe === "string") return maybe;
-    }
-    return "";
-  };
+  const loadData = useCallback(
+    async (mode: ViewMode) => {
+      setLoading(true);
+      setError(null);
+      try {
+        if (!accessToken) throw new Error("Not authenticated");
+        if (mode === "homeworks") {
+          // Use new API to fetch all homework items
+          const res = await fetchAllAdminHomeworks(accessToken);
+          setHomeworksCache(res.items);
+          setHomeworksCacheLoaded(true);
+          setCurrentPage(1); // Reset to first page when loading new data
+        } else {
+          const res = await fetchAdminUsers({}, accessToken);
+          const list = Array.isArray(res)
+            ? res
+            : Array.isArray(res.items)
+              ? res.items
+              : [];
+          const allUsers = list as UserItem[];
+          const standard = allUsers.filter((user) => {
+            const role = (user.role || "").toLowerCase();
+            return role === "standard" || role === "user";
+          });
+          const temporary = allUsers.filter(
+            (user) => (user.role || "").toLowerCase() === "temporary",
+          );
+          const employees = allUsers.filter(
+            (user) => (user.role || "").toLowerCase() === "employee",
+          );
 
-  const isAuthErrorMessage = (message: string) => {
-    if (!message) return false;
-    const lower = message.toLowerCase();
-    return (
-      lower.includes("401") ||
-      lower.includes("unauthorized") ||
-      lower.includes("forbidden") ||
-      lower.includes("not authenticated") ||
-      (lower.includes("token") && lower.includes("expired"))
-    );
-  };
-
-  const handleMaybeAuthError = (error: unknown) => {
-    const message = getErrorMessage(error);
-    if (isAuthErrorMessage(message)) {
-      handleAuthError(setError, router.replace, user?.role);
-      return true;
-    }
-    return false;
-  };
+          setUsers(standard);
+          setTemporaryUsers(temporary);
+          setEmployeeUsers(employees);
+          setStandardUsersLoaded(true);
+        }
+      } catch (err: unknown) {
+        if (handleMaybeAuthError(err)) return;
+        setError(getErrorMessage(err) || "Failed to load data");
+      } finally {
+        setLoading(false);
+        setSelectedIds([]);
+      }
+    },
+    [accessToken, handleMaybeAuthError],
+  );
 
   useEffect(() => {
     // Redirect employee users away from users view
@@ -141,11 +193,17 @@ export function AdminManagementClient() {
       return;
     }
     // For users: only auto-load when we don't already have data
-    if (view === "users" && users.length === 0) {
+    if (view === "users" && !standardUsersLoaded) {
       void loadData(view);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accessToken, view, isEmployee]);
+  }, [
+    accessToken,
+    view,
+    isEmployee,
+    standardUsersLoaded,
+    loadData,
+    homeworksCacheLoaded,
+  ]);
 
   // track which user rows are expanded to show full record details
   const [expandedUserIds, setExpandedUserIds] = useState<string[]>([]);
@@ -157,35 +215,6 @@ export function AdminManagementClient() {
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
     );
   };
-
-  async function loadData(mode: ViewMode) {
-    setLoading(true);
-    setError(null);
-    try {
-      if (!accessToken) throw new Error("Not authenticated");
-      if (mode === "homeworks") {
-        // Use new API to fetch all homework items
-        const res = await fetchAllAdminHomeworks(accessToken);
-        setHomeworksCache(res.items);
-        setHomeworksCacheLoaded(true);
-        setCurrentPage(1); // Reset to first page when loading new data
-      } else {
-        const res = await fetchAdminUsers({}, accessToken);
-        const list = Array.isArray(res)
-          ? res
-          : Array.isArray(res.items)
-            ? res.items
-            : [];
-        setUsers(list as UserItem[]);
-      }
-    } catch (err: unknown) {
-      if (handleMaybeAuthError(err)) return;
-      setError(getErrorMessage(err) || "Failed to load data");
-    } finally {
-      setLoading(false);
-      setSelectedIds([]);
-    }
-  }
 
   // Function to refresh homework cache
   async function refreshHomeworkCache() {
@@ -209,38 +238,22 @@ export function AdminManagementClient() {
       if (!accessToken) throw new Error("Not authenticated");
       const res = await fetchAdminUsers({}, accessToken);
       const list = Array.isArray(res)
-        ? res
+        ? (res as UserItem[])
         : Array.isArray(res.items)
-          ? res.items
+          ? (res.items as UserItem[])
           : [];
 
-      // Only update users of the specific type
-      const newUsers = list as UserItem[];
-      setUsers((prevUsers) => {
-        // Keep existing users that are not of the target type
-        const keepUsers = prevUsers.filter((user) => {
-          if (userType === "temporary") {
-            return (user.role || "").toLowerCase() !== "temporary";
-          } else if (userType === "employee") {
-            const r = (user.role || "").toLowerCase();
-            return r !== "employee";
-          }
-          return true;
-        });
-
-        // Add the refreshed users of the target type
-        const refreshedUsers = newUsers.filter((user) => {
-          if (userType === "temporary") {
-            return (user.role || "").toLowerCase() === "temporary";
-          } else if (userType === "employee") {
-            const r = (user.role || "").toLowerCase();
-            return r === "employee";
-          }
-          return false;
-        });
-
-        return [...keepUsers, ...refreshedUsers];
-      });
+      if (userType === "temporary") {
+        const refreshed = list.filter(
+          (user) => (user.role || "").toLowerCase() === "temporary",
+        );
+        setTemporaryUsers(refreshed);
+      } else {
+        const refreshed = list.filter(
+          (user) => (user.role || "").toLowerCase() === "employee",
+        );
+        setEmployeeUsers(refreshed);
+      }
     } catch (err: unknown) {
       if (handleMaybeAuthError(err)) return;
       setError(getErrorMessage(err) || "Failed to refresh data");
@@ -284,13 +297,7 @@ export function AdminManagementClient() {
     return records;
   }, [homeworksCache, search, sortField, sortDirection, view]);
 
-  const activeRecords =
-    view === "homeworks"
-      ? processedHomeworkRecords
-      : users.filter((user) => {
-          const role = (user.role || "").toLowerCase();
-          return role === "standard" || role === "user";
-        });
+  const activeRecords = view === "homeworks" ? processedHomeworkRecords : users;
 
   const filteredRecords = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -393,12 +400,13 @@ export function AdminManagementClient() {
           .map((member) => member.trim())
           .filter((member) => member.length > 0);
 
+        const isTeam = !!editing.draft.isTeam;
         const sanitizedDraft: AdminHomeworkRecord = {
           ...editing.draft,
-          isTeam: Boolean(editing.draft.isTeam),
+          isTeam,
           groupName: editing.draft.groupName?.trim() || "",
           personName: editing.draft.personName?.trim() || "",
-          members: Boolean(editing.draft.isTeam) ? sanitizedMembers : [],
+          members: isTeam ? sanitizedMembers : [],
         };
 
         if (sanitizedDraft.isTeam && !sanitizedDraft.groupName) {
@@ -426,7 +434,7 @@ export function AdminManagementClient() {
         const draft = editing.draft as UserItem;
 
         // Build payload according to role and provided password
-        const payload: Record<string, any> = {};
+        const payload: Partial<UserItem> & { password?: string } = {};
         if (draft.role === "temporary") {
           payload.username = draft.username;
           if (editingPassword) payload.password = editingPassword;
@@ -523,40 +531,72 @@ export function AdminManagementClient() {
           return;
         }
       } else {
-        // For users - optimistic updates
+        const lookup = new Map(users.map((user) => [user.id, user] as const));
+        const failureIds: string[] = [];
+        const failureMessages: string[] = [];
+
         if (action === "disable" || action === "enable") {
           const block = action === "disable";
+          const nextUsers = [...users];
 
-          // Optimistic update: update blocked status
-          const updatedUsers = users.map((user) =>
-            selectedIds.includes(user.id) ? { ...user, blocked: block } : user,
-          );
-          setUsers(updatedUsers);
+          for (const id of selectedIds) {
+            try {
+              await blockAdminUser(id, block, accessToken);
+              const index = nextUsers.findIndex((user) => user.id === id);
+              if (index !== -1) {
+                nextUsers[index] = { ...nextUsers[index], blocked: block };
+              }
+            } catch (err: unknown) {
+              if (handleMaybeAuthError(err)) return;
+              failureIds.push(id);
+              const ref = lookup.get(id);
+              const name = ref?.username || ref?.display_name || "User";
+              failureMessages.push(
+                `${name}: ${getErrorMessage(err) || "Block/Unblock failed"}`,
+              );
+            }
+          }
 
-          // Call backend
-          await Promise.all(
-            selectedIds.map((id) => blockAdminUser(id, block, accessToken)),
-          );
+          setUsers(nextUsers);
         } else if (action === "ban" || action === "delete") {
-          // Optimistic update: remove users
-          const updatedUsers = users.filter(
-            (user) => !selectedIds.includes(user.id),
-          );
-          setUsers(updatedUsers);
+          const successIds: string[] = [];
 
-          // Call backend
-          await Promise.all(
-            selectedIds.map((id) => deleteAdminUser(id, accessToken)),
-          );
+          for (const id of selectedIds) {
+            try {
+              await deleteAdminUser(id, accessToken);
+              successIds.push(id);
+            } catch (err: unknown) {
+              if (handleMaybeAuthError(err)) return;
+              failureIds.push(id);
+              const ref = lookup.get(id);
+              const name = ref?.username || ref?.display_name || "User";
+              failureMessages.push(
+                `${name}: ${getErrorMessage(err) || "Delete failed"}`,
+              );
+            }
+          }
+
+          if (successIds.length > 0) {
+            setUsers((prev) =>
+              prev.filter((user) => !successIds.includes(user.id)),
+            );
+          }
         } else {
-          // Fallback to bulk API if action supported
           await bulkUpdateAdminUsers({ ids: selectedIds, action }, accessToken);
-          // Reload data since we don't know the exact changes
           await loadData("users");
+          setSelectedIds([]);
+          setError(null);
+          return;
+        }
+
+        if (failureIds.length > 0) {
+          setSelectedIds(failureIds);
+          setError(failureMessages.join(" | "));
+        } else {
+          setSelectedIds([]);
+          setError(null);
         }
       }
-
-      setSelectedIds([]);
     } catch (err: unknown) {
       // Rollback optimistic updates on error
       if (view === "homeworks") {
@@ -576,8 +616,8 @@ export function AdminManagementClient() {
     setCreatingTemp(true);
     try {
       if (!accessToken) throw new Error("Not authenticated");
-      await createTemporaryAccount(tempAccount, accessToken);
-      await loadData("users");
+      const created = await createTemporaryAccount(tempAccount, accessToken);
+      setTemporaryUsers((prev) => [...prev, created]);
       setTempAccount({ username: "", password: "" });
     } catch (err: unknown) {
       if (handleMaybeAuthError(err)) return;
@@ -620,9 +660,11 @@ export function AdminManagementClient() {
       if (!accessToken) throw new Error("Not authenticated");
 
       // Send accounts one-by-one to backend to surface per-account errors
+      const createdUsers: UserItem[] = [];
       for (const acct of accounts) {
         try {
-          await createEmployerAccount(acct, accessToken);
+          const created = await createEmployerAccount(acct, accessToken);
+          createdUsers.push(created);
         } catch (err: unknown) {
           if (handleMaybeAuthError(err)) throw err;
           const msg = getErrorMessage(err) || "Create failed for an account";
@@ -631,7 +673,9 @@ export function AdminManagementClient() {
         }
       }
 
-      await loadData("users");
+      if (createdUsers.length > 0) {
+        setEmployeeUsers((prev) => [...prev, ...createdUsers]);
+      }
       setEmployerDrafts([
         { display_name: "", email: "", password: "", username: "" },
       ]);
@@ -645,21 +689,6 @@ export function AdminManagementClient() {
 
   const displayedSelected = selectedIds.filter((id) =>
     filteredRecords.some((record) => record.id === id),
-  );
-
-  const temporaryUsers = useMemo(
-    () =>
-      users.filter((user) => (user.role || "").toLowerCase() === "temporary"),
-    [users],
-  );
-
-  const employerUsers = useMemo(
-    () =>
-      users.filter((user) => {
-        const r = (user.role || "").toLowerCase();
-        return r === "employee";
-      }),
-    [users],
   );
 
   const renderHomeworkRow = (record: AdminHomeworkRecord) => (
@@ -1307,7 +1336,12 @@ export function AdminManagementClient() {
             </p>
             <div className="mt-4 space-y-3">
               {employerDrafts.map((draft, index) => (
-                <div key={index} className="grid gap-3 sm:grid-cols-3">
+                <div
+                  key={
+                    draft.email || draft.username || draft.display_name || index
+                  }
+                  className="grid gap-3 sm:grid-cols-3"
+                >
                   <label className="text-sm text-foreground/80">
                     Display Name
                     <input
@@ -1475,7 +1509,13 @@ export function AdminManagementClient() {
                                   !user.blocked,
                                   accessToken,
                                 );
-                                await refreshSpecificUsers("temporary");
+                                setTemporaryUsers((prev) =>
+                                  prev.map((entry) =>
+                                    entry.id === user.id
+                                      ? { ...entry, blocked: !user.blocked }
+                                      : entry,
+                                  ),
+                                );
                               } catch (err: unknown) {
                                 if (handleMaybeAuthError(err)) return;
                                 setError(
@@ -1511,7 +1551,9 @@ export function AdminManagementClient() {
                                   throw new Error("Not authenticated");
                                 setBlockingIds((prev) => [...prev, user.id]);
                                 await deleteAdminUser(user.id, accessToken);
-                                await refreshSpecificUsers("temporary");
+                                setTemporaryUsers((prev) =>
+                                  prev.filter((entry) => entry.id !== user.id),
+                                );
                               } catch (err: unknown) {
                                 if (handleMaybeAuthError(err)) return;
                                 setError(
@@ -1597,7 +1639,13 @@ export function AdminManagementClient() {
                                   !user.blocked,
                                   accessToken,
                                 );
-                                await refreshSpecificUsers("employee");
+                                setEmployeeUsers((prev) =>
+                                  prev.map((entry) =>
+                                    entry.id === user.id
+                                      ? { ...entry, blocked: !user.blocked }
+                                      : entry,
+                                  ),
+                                );
                               } catch (err: unknown) {
                                 if (handleMaybeAuthError(err)) return;
                                 setError(
@@ -1633,7 +1681,9 @@ export function AdminManagementClient() {
                                   throw new Error("Not authenticated");
                                 setBlockingIds((prev) => [...prev, user.id]);
                                 await deleteAdminUser(user.id, accessToken);
-                                await refreshSpecificUsers("employee");
+                                setEmployeeUsers((prev) =>
+                                  prev.filter((entry) => entry.id !== user.id),
+                                );
                               } catch (err: unknown) {
                                 if (handleMaybeAuthError(err)) return;
                                 setError(
@@ -1814,7 +1864,10 @@ export function AdminManagementClient() {
                           ? editingHomework.members
                           : [""]
                         ).map((member, index) => (
-                          <div key={index} className="flex items-center gap-2">
+                          <div
+                            key={`${editingHomework.id ?? "draft"}-${index}`}
+                            className="flex items-center gap-2"
+                          >
                             <input
                               value={member}
                               onChange={(e) =>
