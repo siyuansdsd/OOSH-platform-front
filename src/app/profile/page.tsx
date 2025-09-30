@@ -15,7 +15,7 @@ export default function ProfilePage() {
 type MessageState = { text: string; variant: "success" | "error" } | null;
 
 function ProfileForm() {
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile, handleAuthError } = useAuth();
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -53,6 +53,7 @@ function ProfileForm() {
       await updateProfile(trimmed);
       setMessage({ text: "Profile updated successfully.", variant: "success" });
     } catch (error: unknown) {
+      handleAuthError(error);
       setMessage({
         text:
           error instanceof Error ? error.message : "Failed to update profile.",

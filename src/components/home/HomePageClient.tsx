@@ -39,7 +39,7 @@ type RunFetchArgs = {
 };
 
 export function HomePageClient() {
-  const { accessToken } = useAuth();
+  const { accessToken, handleAuthError } = useAuth();
   const [formFilters, setFormFilters] = useState<Filters>(defaultFilters);
   const [activeFilters, setActiveFilters] = useState<Filters>(defaultFilters);
   const [items, setItems] = useState<HomeworkRecord[]>([]);
@@ -165,6 +165,7 @@ export function HomePageClient() {
         });
       } catch (error: unknown) {
         if (controller.signal.aborted) return;
+        handleAuthError(error);
         setError(
           error instanceof Error ? error.message : "Failed to load data",
         );
@@ -175,7 +176,7 @@ export function HomePageClient() {
         }
       }
     },
-    [accessToken, buildCacheKey],
+    [accessToken, buildCacheKey, handleAuthError],
   );
 
   const handleSearch = () => {

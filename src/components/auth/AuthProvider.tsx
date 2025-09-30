@@ -10,6 +10,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { useRouter } from "next/navigation";
 import {
   logout as apiLogout,
   type LoginResponse,
@@ -48,6 +49,7 @@ interface AuthContextValue {
   refresh: () => Promise<void>;
   updateProfile: (displayName: string) => Promise<void>;
   adoptLoginResponse: (response: LoginResponse) => void;
+  handleAuthError: (error: unknown) => void;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -102,6 +104,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
   const [loading, setLoading] = useState(true);
   const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const router = useRouter();
 
   const setFromResponse = useCallback((resp: LoginResponse) => {
     const tokenExpiresAt = Date.now() + parseExpiresIn(resp.expiresIn);
@@ -123,6 +126,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (error) {
       console.error("Refresh failed", error);
       setSession(null);
+      // For refresh token failures, always redirect to login since session is invalid
+      const currentScope = session?.user.scope;
+      const redirectPath = currentScope === "admin" ? "/admin-login" : "/login";
+      window.location.replace(redirectPath);
     }
   }, [session?.refreshToken, session?.user.scope, setFromResponse]);
 
@@ -221,6 +228,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [setFromResponse],
   );
 
+  const handleAuthError = useCallback(
+    (error: unknown) => {
+      const isUnauthorized =
+        (error instanceof Error && error.message.includes("401")) ||
+        (error instanceof Error && error.message.includes("invalid token")) ||
+        (typeof error === "object" && error !== null && "status" in error && error.status === 401);
+
+      if (isUnauthorized) {
+        console.warn("Authentication error detected, logging out user", error);
+        setSession(null);
+        const currentScope = session?.user.scope;
+        const redirectPath = currentScope === "admin" ? "/admin-login" : "/login";
+        router.replace(redirectPath);
+      }
+    },
+    [session?.user.scope, router],
+  );
+
   const updateProfile = useCallback(
     async (displayName: string) => {
       if (!session?.token) throw new Error("Not authenticated");
@@ -258,6 +283,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       refresh: doRefresh,
       updateProfile,
       adoptLoginResponse,
+      handleAuthError,
     }),
     [
       session,
@@ -269,6 +295,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       doRefresh,
       updateProfile,
       adoptLoginResponse,
+      handleAuthError,
     ],
   );
 
