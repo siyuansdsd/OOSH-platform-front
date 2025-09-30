@@ -15,9 +15,9 @@ const PAGE_SIZE = 12;
 
 interface CacheEntry {
   items: HomeworkRecord[];
-  page: number;
+  nextCursor: string | null;
   hasMore: boolean;
-  total: number;
+  total?: number;
   pageSize: number;
 }
 
@@ -33,7 +33,7 @@ const defaultFilters: Filters = {
 
 type RunFetchArgs = {
   filters: Filters;
-  page: number;
+  cursor?: string;
   append: boolean;
   ignoreCache?: boolean;
 };
@@ -44,7 +44,7 @@ export function HomePageClient() {
   const [activeFilters, setActiveFilters] = useState<Filters>(defaultFilters);
   const [items, setItems] = useState<HomeworkRecord[]>([]);
   const itemsRef = useRef<HomeworkRecord[]>([]);
-  const [page, setPage] = useState(1);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [serverTotal, setServerTotal] = useState<number | null>(null);
   const [serverHasMore, setServerHasMore] = useState<boolean | null>(null);
@@ -78,9 +78,9 @@ export function HomePageClient() {
       const cached = cacheRef.current.get(buildCacheKey(filters));
       if (!cached) return false;
       setItems(cached.items);
-      setPage(cached.page);
+      setNextCursor(cached.nextCursor);
       setHasMore(cached.hasMore);
-      setServerTotal(cached.total);
+      setServerTotal(cached.total ?? null);
       setServerHasMore(cached.hasMore);
       setLoading(false);
       setLoadingMore(false);
@@ -91,7 +91,7 @@ export function HomePageClient() {
   );
 
   const runFetch = useCallback(
-    async ({ filters, page, append, ignoreCache = false }: RunFetchArgs) => {
+    async ({ filters, cursor, append, ignoreCache = false }: RunFetchArgs) => {
       if (!accessToken) return;
 
       const cacheKey = buildCacheKey(filters);
@@ -99,9 +99,9 @@ export function HomePageClient() {
 
       if (!append && !ignoreCache && cachedEntry) {
         setItems(cachedEntry.items);
-        setPage(cachedEntry.page);
+        setNextCursor(cachedEntry.nextCursor);
         setHasMore(cachedEntry.hasMore);
-        setServerTotal(cachedEntry.total);
+        setServerTotal(cachedEntry.total ?? null);
         setServerHasMore(cachedEntry.hasMore);
         setLoading(false);
         setLoadingMore(false);
@@ -118,7 +118,7 @@ export function HomePageClient() {
 
       try {
         const commonParams: HomeworkListParams = {
-          page,
+          cursor,
           pageSize: PAGE_SIZE,
           school: filters.school || undefined,
           name: filters.name || undefined,
@@ -145,27 +145,20 @@ export function HomePageClient() {
 
         setItems(combinedItems);
 
-        const nextPage = result.page ?? page;
+        const nextCursorValue = result.nextCursor ?? null;
         const rawHasMore =
           typeof result.hasMore === "boolean" ? result.hasMore : null;
-        const nextHasMore =
-          rawHasMore !== null
-            ? rawHasMore
-            : normalizedItems.length > 0 &&
-              normalizedItems.length === (result.pageSize ?? PAGE_SIZE);
-        const nextTotal =
-          typeof result.total === "number"
-            ? result.total
-            : combinedItems.length;
+        const nextHasMore = rawHasMore !== null ? rawHasMore : nextCursorValue !== null;
+        const nextTotal = result.total;
 
-        setPage(nextPage);
+        setNextCursor(nextCursorValue);
         setHasMore(nextHasMore);
-        setServerTotal(nextTotal);
+        setServerTotal(nextTotal ?? null);
         setServerHasMore(rawHasMore);
 
         cacheRef.current.set(cacheKey, {
           items: combinedItems,
-          page: nextPage,
+          nextCursor: nextCursorValue,
           hasMore: nextHasMore,
           total: nextTotal,
           pageSize: result.pageSize ?? PAGE_SIZE,
@@ -188,7 +181,7 @@ export function HomePageClient() {
   const handleSearch = () => {
     const nextFilters = { ...formFilters };
     setActiveFilters(nextFilters);
-    setPage(1);
+    setNextCursor(null);
     setHasMore(false);
     setServerHasMore(null);
     setError(null);
@@ -199,7 +192,7 @@ export function HomePageClient() {
     if (loadingMore || !hasMore) return;
     runFetch({
       filters: activeFilters,
-      page: page + 1,
+      cursor: nextCursor || undefined,
       append: true,
     });
   };
@@ -208,7 +201,7 @@ export function HomePageClient() {
     if (!accessToken) return;
     runFetch({
       filters: activeFilters,
-      page: 1,
+      cursor: undefined,
       append: false,
     });
   }, [accessToken, activeFilters, runFetch]);

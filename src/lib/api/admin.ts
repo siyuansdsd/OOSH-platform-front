@@ -201,8 +201,8 @@ export async function fetchAdminHomeworks(
   });
   return {
     items,
-    total: res.total,
-    page: res.page,
+    total: res.total ?? 0,
+    page: 1,
     pageSize: res.pageSize,
   } satisfies PaginatedResult<AdminHomeworkRecord>;
 }

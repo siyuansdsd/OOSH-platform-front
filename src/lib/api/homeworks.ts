@@ -19,7 +19,7 @@ export interface HomeworkRecord {
 }
 
 export interface HomeworkListParams {
-  page?: number;
+  cursor?: string;
   pageSize?: number;
   school?: string;
   name?: string;
@@ -29,8 +29,8 @@ export interface HomeworkListParams {
 
 export interface HomeworkListResult {
   items: HomeworkRecord[];
-  total: number;
-  page: number;
+  total?: number;
+  nextCursor?: string | null;
   pageSize: number;
   hasMore: boolean;
   raw?: unknown;
@@ -297,8 +297,8 @@ const fetchHomeworksFromEndpoint = async (
   token?: string,
 ) => {
   const searchParams = new URLSearchParams();
-  if (params.page && params.page > 0)
-    searchParams.set("page", String(params.page));
+  if (params.cursor)
+    searchParams.set("cursor", params.cursor);
   if (params.pageSize && params.pageSize > 0) {
     // Primary param name
     searchParams.set("pageSize", String(params.pageSize));
@@ -351,12 +351,12 @@ const fetchHomeworksFromEndpoint = async (
   ]);
   const total = toFiniteNumber(totalRaw) ?? rawItems.length;
 
-  const pageRaw = pickFromSources(metaSources, [
-    "page",
-    "pageNumber",
-    "currentPage",
+  const nextCursorRaw = pickFromSources(metaSources, [
+    "nextCursor",
+    "next_cursor",
+    "cursor",
   ]);
-  const page = toFiniteNumber(pageRaw) ?? params.page ?? 1;
+  const nextCursor = typeof nextCursorRaw === "string" ? nextCursorRaw : null;
 
   const pageSizeRaw = pickFromSources(metaSources, [
     "pageSize",
@@ -366,16 +366,14 @@ const fetchHomeworksFromEndpoint = async (
   const pageSize =
     toFiniteNumber(pageSizeRaw) ?? params.pageSize ?? items.length;
 
-  const safeTotal = total < 0 ? rawItems.length : total;
-  const safePage = page < 1 ? 1 : page;
+  const safeTotal = total < 0 ? undefined : total;
   const safePageSize = pageSize < 1 ? Math.max(items.length, 1) : pageSize;
-  const hasMore =
-    items.length > 0 && safePage * safePageSize < (safeTotal || items.length);
+  const hasMore = nextCursor !== null || (items.length > 0 && items.length === safePageSize);
 
   return {
     items,
-    total: safeTotal || items.length,
-    page: safePage,
+    total: safeTotal,
+    nextCursor,
     pageSize: safePageSize,
     hasMore,
     raw: parsed,
