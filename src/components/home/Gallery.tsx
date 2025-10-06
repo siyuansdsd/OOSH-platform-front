@@ -404,7 +404,7 @@ export function Gallery({
     useEffect(() => () => stopVideo(), [stopVideo]);
     useEffect(() => {
       stopVideo();
-    }, [stopVideo]);
+    }, [item.id, stopVideo]);
 
     if (imageCount > 0) {
       return (
