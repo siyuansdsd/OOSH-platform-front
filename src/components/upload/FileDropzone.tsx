@@ -88,7 +88,7 @@ export default function FileDropzone({
   );
 
   const onDrop = useCallback(
-    (e: DragEvent<HTMLDivElement>) => {
+    (e: DragEvent<HTMLElement>) => {
       e.preventDefault();
       setDragOver(false);
       handleFiles(e.dataTransfer.files);
