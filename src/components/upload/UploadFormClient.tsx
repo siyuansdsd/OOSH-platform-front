@@ -1,33 +1,17 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
-import UploadTypeSelector from "./UploadTypeSelector";
-import FileDropzone from "./FileDropzone";
+import { useMemo, useState } from "react";
+import { useAuth } from "@/components/auth/AuthProvider";
 import UrlUploader from "@/components/upload/UrlUploader";
+import { APPROVED_SCHOOLS, type ApprovedSchool } from "@/constants/schools";
 import { Spinner } from "../ui/Spinner";
+import FileDropzone from "./FileDropzone";
 import {
   UploadContext,
-  type ValidationErrors,
   type UploadMode,
+  type ValidationErrors,
 } from "./UploadContext";
-import { useAuth } from "@/components/auth/AuthProvider";
-import { APPROVED_SCHOOLS, type ApprovedSchool } from "@/constants/schools";
-import DOMPurify from "dompurify";
-
-const EN_NAME = /^[A-Za-z ]+$/;
-
-// Sanitize description while preserving line breaks
-const sanitizeDescription = (text: string): string => {
-  if (typeof window === 'undefined') return text;
-
-  // Convert line breaks to a placeholder, sanitize, then restore line breaks
-  const withPlaceholders = text.replace(/\n/g, '___LINEBREAK___');
-  const sanitized = DOMPurify.sanitize(withPlaceholders, {
-    ALLOWED_TAGS: [], // No HTML tags allowed
-    ALLOWED_ATTR: [] // No attributes allowed
-  });
-  return sanitized.replace(/___LINEBREAK___/g, '\n');
-};
+import UploadTypeSelector from "./UploadTypeSelector";
 
 function FieldError({
   message,
@@ -55,14 +39,7 @@ export default function UploadFormClient() {
   const [mode, setMode] = useState<UploadMode>("file");
   const [files, setFiles] = useState<File[]>([]);
   const [urls, setUrls] = useState<string[]>([""]);
-  const [schoolName, setSchoolName] = useState<ApprovedSchool | "">
-    ("");
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [groupName, setGroupName] = useState("");
-  const [is_team, setIsTeam] = useState(false);
-  const [members, setMembers] = useState<string[]>([""]);
-  const [person_name, setPersonName] = useState("");
+  const [schoolName, setSchoolName] = useState<ApprovedSchool | "">("");
   const [errors, setErrors] = useState<ValidationErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState<string | null>(null);
@@ -78,76 +55,24 @@ export default function UploadFormClient() {
       setUrls,
       schoolName,
       setSchoolName,
-      title,
-      setTitle,
-      description,
-      setDescription,
-      groupName,
-      setGroupName,
-      is_team,
-      setIsTeam,
-      members,
-      setMembers,
-      person_name,
-      setPersonName,
       errors,
       setErrors,
       disabled: submitting,
     }),
-    [
-      mode,
-      files,
-      urls,
-      schoolName,
-      title,
-      description,
-      groupName,
-      is_team,
-      members,
-      person_name,
-      errors,
-      submitting,
-    ]
+    [mode, files, urls, schoolName, errors, submitting],
   );
 
   const validate = (): boolean => {
     const e: ValidationErrors = {};
-    const check = (key: string, val: string, label: string) => {
-      const trimmed = val.trim();
-      if (!trimmed) e[key] = `${label} is required`;
-      else if (!EN_NAME.test(trimmed))
-        e[key] = `${label} must be English letters and spaces only`;
-    };
     if (!schoolName) {
       e.schoolName = "Select a school from the list";
     }
-    if (!title.trim()) e.title = "Title is required";
-    const sanitizedDesc = sanitizeDescription(description.trim());
-    if (!sanitizedDesc) e.description = "Description is required";
 
     if (mode === "file") {
       if (!files.length) e.files = "Please add at least one image or video";
     } else {
       const cleaned = urls.map((u) => u.trim()).filter(Boolean);
       if (!cleaned.length) e.urls = "Please add at least one URL";
-    }
-
-    if (is_team) {
-      check("groupName", groupName, "Team Name");
-      const trimmedMembers = members.map((m) => m.trim());
-      const filledMembers = trimmedMembers.filter(Boolean);
-      if (filledMembers.length === 0) {
-        e.members = "Please provide at least one team member name";
-      }
-      trimmedMembers.forEach((m, idx) => {
-        if (m && !EN_NAME.test(m)) {
-          e[`members_${idx}`] = `Member ${
-            idx + 1
-          } must be English letters and spaces only`;
-        }
-      });
-    } else {
-      check("person_name", person_name, "Person Name");
     }
     setErrors(e);
     return Object.keys(e).length === 0;
@@ -159,20 +84,6 @@ export default function UploadFormClient() {
     setSubmitting(true);
     try {
       if (mode === "file") {
-        // Presign JSON flow: request presigns -> PUT to S3 -> write-back
-        const trimmedMembers = members.map((m) => m.trim()).filter(Boolean);
-        const presignReq = {
-          files: files.map((f) => ({ filename: f.name, contentType: f.type })),
-          schoolName: schoolName.trim(),
-          title: title.trim(),
-          description: sanitizeDescription(description),
-          groupName: is_team ? groupName.trim() : undefined,
-          is_team,
-          members: is_team ? trimmedMembers : undefined,
-          person_name: !is_team ? person_name.trim() : undefined,
-          mode,
-        } as const;
-
         if (!accessToken) throw new Error("Not authenticated");
 
         const presignRes = await fetch("/api/uploads/create-and-presign", {
@@ -181,7 +92,14 @@ export default function UploadFormClient() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${accessToken}`,
           },
-          body: JSON.stringify(presignReq),
+          body: JSON.stringify({
+            files: files.map((f) => ({
+              filename: f.name,
+              contentType: f.type,
+            })),
+            schoolName: schoolName.trim(),
+            mode,
+          }),
         });
         if (!presignRes.ok) {
           const text = await presignRes.text();
@@ -196,6 +114,7 @@ export default function UploadFormClient() {
           .clone()
           .text()
           .catch(() => "");
+        // biome-ignore lint/suspicious/noExplicitAny: backend response shape varies across deployments
         const raw: any = await presignRes.json().catch(() => {
           try {
             return rawText ? JSON.parse(rawText) : {};
@@ -204,23 +123,25 @@ export default function UploadFormClient() {
           }
         });
         // Robust extractor: handles single-object, arrays, maps, and various envelope keys
+        // biome-ignore lint/suspicious/noExplicitAny: helper must accept mixed payload structures
         const pickFirst = (...vals: any[]) =>
           vals.find((v) => v !== undefined && v !== null);
         const roots = [raw, raw?.data, raw?.result, raw?.payload];
         const getFromRoots = (key: string) =>
           pickFirst(
             ...roots.map((r) =>
-              r && typeof r === "object" ? r[key] : undefined
-            )
+              r && typeof r === "object" ? r[key] : undefined,
+            ),
           );
         const homeworkObj = pickFirst(getFromRoots("homework"));
         const homeworkId = pickFirst(
           getFromRoots("homeworkId"),
           getFromRoots("homework_id"),
           homeworkObj?.id,
-          getFromRoots("id")
+          getFromRoots("id"),
         );
-        let presignsAny: any = pickFirst(
+        // biome-ignore lint/suspicious/noExplicitAny: dynamic API payloads require flexible parsing
+        const presignsAny: any = pickFirst(
           getFromRoots("presigns"),
           getFromRoots("presign"),
           getFromRoots("signed"),
@@ -246,8 +167,9 @@ export default function UploadFormClient() {
               return hasPresignHints ? d : undefined;
             }
             return undefined;
-          })()
+          })(),
         );
+        // biome-ignore lint/suspicious/noExplicitAny: casting heterogeneous payloads to arrays
         const toArray = (v: any): any[] => {
           if (!v) return [];
           if (Array.isArray(v)) return v;
@@ -256,6 +178,7 @@ export default function UploadFormClient() {
         };
         let presignsArr = toArray(presignsAny);
         // Helper to recognize presign-ish objects
+        // biome-ignore lint/suspicious/noExplicitAny: type guard for unknown presign shapes
         const looksLikePresign = (o: any) =>
           o &&
           typeof o === "object" &&
@@ -271,25 +194,29 @@ export default function UploadFormClient() {
         // Fallback: scan roots for a single-object
         if (presignsArr.length === 0) {
           const candidate = roots.find((r) => looksLikePresign(r));
-          if (candidate) presignsArr = [candidate as any];
+          if (candidate)
+            presignsArr = [
+              // biome-ignore lint/suspicious/noExplicitAny: dynamic API payloads
+              candidate as any,
+            ];
         }
         // Fallback: arrays at root or envelopes
         if (presignsArr.length === 0) {
           const arrayRoot = roots.find((r) => Array.isArray(r)) as
-            | any[]
-            | undefined;
-          if (arrayRoot && arrayRoot.some((it) => looksLikePresign(it))) {
+            // biome-ignore lint/suspicious/noExplicitAny: dynamic API payloads
+            any[] | undefined;
+          if (arrayRoot?.some((it) => looksLikePresign(it))) {
             presignsArr = arrayRoot.filter((it) => looksLikePresign(it));
           }
         }
         if (presignsArr.length === 0) {
           for (const k of ["data", "result", "payload"]) {
-            const arr = (raw as any)?.[k];
+            const arr = (raw as Record<string, unknown>)?.[k] as unknown;
             if (
               Array.isArray(arr) &&
-              arr.some((it: any) => looksLikePresign(it))
+              arr.some((it: unknown) => looksLikePresign(it))
             ) {
-              presignsArr = arr.filter((it: any) => looksLikePresign(it));
+              presignsArr = arr.filter((it: unknown) => looksLikePresign(it));
               break;
             }
           }
@@ -297,12 +224,13 @@ export default function UploadFormClient() {
         if (!homeworkId || presignsArr.length === 0) {
           const snippet = (rawText || "").slice(0, 200);
           throw new Error(
-            `No presigns returned${snippet ? `: ${snippet}` : ""}`
+            `No presigns returned${snippet ? `: ${snippet}` : ""}`,
           );
         }
 
         // Upload to S3
         await Promise.all(
+          // biome-ignore lint/suspicious/noExplicitAny: presign entries are dynamic objects
           presignsArr.map(async (p: any) => {
             const f = files.find((x) => x.name === p.filename);
             if (!f || !p?.uploadUrl) return;
@@ -312,7 +240,7 @@ export default function UploadFormClient() {
               body: f,
             });
             if (!put.ok) throw new Error(`Upload failed for ${p.filename}`);
-          })
+          }),
         );
 
         // Classify images/videos and write back (robust to single-file + varying keys)
@@ -339,6 +267,7 @@ export default function UploadFormClient() {
         ]);
         const getExt = (name: string) =>
           (name.split(".").pop() || "").toLowerCase();
+        // biome-ignore lint/suspicious/noExplicitAny: presign entries are dynamic objects
         const urlOf = (p: any) => {
           const direct =
             p?.fileUrl ||
@@ -359,17 +288,16 @@ export default function UploadFormClient() {
         };
 
         // Pair presigns to original files (by name, else index)
+        // biome-ignore lint/suspicious/noExplicitAny: presign entries are dynamic objects
         const pairs = presignsArr.map((p: any, i: number) => {
           const byName = files.find((x) => x.name === p.filename) || null;
           const file = byName ?? files[i] ?? files[0] ?? null;
           const nameForExt = String(p?.filename || file?.name || "");
           const ctype = String(p?.contentType || file?.type || "");
           const img =
-            (ctype && ctype.startsWith("image/")) ||
-            imgExt.has(getExt(nameForExt));
+            ctype?.startsWith("image/") || imgExt.has(getExt(nameForExt));
           const vid =
-            (ctype && ctype.startsWith("video/")) ||
-            vidExt.has(getExt(nameForExt));
+            ctype?.startsWith("video/") || vidExt.has(getExt(nameForExt));
           const finalUrl = urlOf(p);
           return { p, file, img, vid, url: finalUrl };
         });
@@ -405,15 +333,9 @@ export default function UploadFormClient() {
             body: JSON.stringify({
               images,
               videos,
-              title: title.trim(),
-              description: sanitizeDescription(description),
               school_name: schoolName.trim(),
-              group_name: is_team ? groupName.trim() : undefined,
-              person_name: !is_team ? person_name.trim() : undefined,
-              is_team,
-              members: is_team ? trimmedMembers : undefined,
             }),
-          }
+          },
         );
         if (!writeRes.ok) {
           const text = await writeRes.text().catch(() => "");
@@ -426,15 +348,8 @@ export default function UploadFormClient() {
       } else {
         // URL-only flow: direct POST
         const cleaned = urls.map((u) => u.trim()).filter(Boolean);
-        const trimmedMembers = members.map((m) => m.trim()).filter(Boolean);
         const payload = {
           school_name: schoolName.trim(),
-          is_team,
-          title: title.trim(),
-          description: sanitizeDescription(description),
-          person_name: !is_team ? person_name.trim() : undefined,
-          group_name: is_team ? groupName.trim() : undefined,
-          members: is_team ? trimmedMembers : undefined,
           urls: cleaned,
         };
         const res = await fetch("/api/homeworks", {
@@ -456,8 +371,12 @@ export default function UploadFormClient() {
       }
 
       setSuccess(true);
-    } catch (err: any) {
-      setServerError(err?.message || "Submit failed");
+      setFiles([]);
+      setUrls([""]);
+      setSchoolName("");
+      setErrors({});
+    } catch (err: unknown) {
+      setServerError(err instanceof Error ? err.message : "Submit failed");
     } finally {
       setSubmitting(false);
     }
@@ -481,228 +400,64 @@ export default function UploadFormClient() {
     <UploadContext.Provider value={ctxValue}>
       <div className="mx-auto w-full max-w-3xl">
         <div className="glass-panel rounded-3xl p-6 shadow-lg">
-          <h2 className="text-xl font-semibold mb-4">Content Upload</h2>
-
-          <div className="mb-6">
-            <UploadTypeSelector />
-          </div>
-
-          {mode === "file" ? (
-            <div className="mb-6">
-              <FileDropzone />
+          <h2 className="mb-4 text-xl font-semibold">Content Upload</h2>
+          <div className="space-y-6">
+            <div>
+              <UploadTypeSelector />
             </div>
-          ) : (
-            <div className="mb-6">
-              <UrlUploader />
+
+            <label className="block">
+              <div className="mb-1 text-sm text-foreground/80">School Name</div>
+              <select
+                value={schoolName}
+                onChange={(e) =>
+                  setSchoolName(e.target.value as ApprovedSchool | "")
+                }
+                disabled={submitting}
+                className="w-full rounded-xl border border-foreground/15 bg-white/70 px-4 py-3 outline-none transition focus-visible:ring-2 focus-visible:ring-blue-500/60 dark:bg-black/20"
+              >
+                <option value="">Select a school</option>
+                {APPROVED_SCHOOLS.map((school) => (
+                  <option key={school} value={school}>
+                    {school}
+                  </option>
+                ))}
+              </select>
+              <FieldError message={errors.schoolName} className="mt-1" />
+            </label>
+
+            {mode === "file" ? (
+              <>
+                <FileDropzone />
+                <FieldError message={errors.files} />
+              </>
+            ) : (
+              <>
+                <UrlUploader />
+                <FieldError message={errors.urls} />
+              </>
+            )}
+
+            {serverError ? (
+              <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-red-600">
+                {serverError}
+              </div>
+            ) : null}
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                disabled={submitting}
+                onClick={handleSubmit}
+                className="btn-gradient rounded-xl px-5 py-2.5 text-sm font-semibold text-foreground transition disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-200/80 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              >
+                Submit
+              </button>
+              {submitting && <Spinner label="Uploading..." />}
             </div>
-          )}
-
-          <FieldError
-            message={errors.files}
-            className="-mt-4 mb-4"
-          />
-          <FieldError
-            message={errors.urls}
-            className="-mt-4 mb-4"
-          />
-
-          <TraditionalFields />
-
-        {serverError ? (
-          <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-red-600">
-            {serverError}
-          </div>
-        ) : null}
-
-          <div className="mt-6 flex items-center gap-3">
-            <button
-              type="button"
-              disabled={submitting}
-              onClick={handleSubmit}
-              className="btn-gradient rounded-xl px-5 py-2.5 text-sm font-semibold text-foreground transition disabled:cursor-not-allowed disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-orange-200/80 focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
-              Submit
-            </button>
-            {submitting && <Spinner label="uploading..." />}
           </div>
         </div>
       </div>
     </UploadContext.Provider>
-  );
-}
-
-function TraditionalFields() {
-  const {
-    schoolName,
-    setSchoolName,
-    title,
-    setTitle,
-    description,
-    setDescription,
-    groupName,
-    setGroupName,
-    is_team,
-    setIsTeam,
-    members,
-    setMembers,
-    person_name,
-    setPersonName,
-    errors,
-    disabled,
-  } = React.useContext(UploadContext)!;
-
-  const baseInput =
-    "w-full rounded-xl border border-foreground/15 bg-white/70 dark:bg-black/20 px-4 py-3 outline-none transition-all duration-200 focus-visible:ring-2 focus-visible:ring-blue-500/60 focus-visible:shadow-[0_0_0_4px_rgba(59,130,246,0.12)]";
-
-  return (
-    <div className="grid grid-cols-1 gap-4">
-      <label className="block">
-        <div className="mb-1 text-sm text-foreground/80">Project Title</div>
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          onBlur={(e) => setTitle(e.target.value.trim())}
-          disabled={disabled}
-          className={baseInput}
-          placeholder="Enter project title"
-        />
-        <FieldError message={errors.title} className="mt-1" />
-      </label>
-
-      <label className="block">
-        <div className="mb-1 text-sm text-foreground/80">Project Description</div>
-        <textarea
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          onBlur={(e) => {
-            // Trim only leading/trailing whitespace, preserve internal line breaks
-            const trimmed = e.target.value.replace(/^\s+|\s+$/g, '');
-            const sanitized = sanitizeDescription(trimmed);
-            setDescription(sanitized);
-          }}
-          disabled={disabled}
-          className={`${baseInput} min-h-[120px] resize-y`}
-          placeholder="Describe the project (line breaks allowed)"
-          rows={5}
-        />
-        <FieldError message={errors.description} className="mt-1" />
-      </label>
-
-      <label className="block">
-        <div className="mb-1 text-sm text-foreground/80">School Name</div>
-        <select
-          value={schoolName}
-          onChange={(e) =>
-            setSchoolName(e.target.value as ApprovedSchool | "")
-          }
-          disabled={disabled}
-          className={`${baseInput} bg-white/80 dark:bg-black/40`}
-        >
-          <option value="">Select a school</option>
-          {APPROVED_SCHOOLS.map((school) => (
-            <option key={school} value={school}>
-              {school}
-            </option>
-          ))}
-        </select>
-        <FieldError message={errors.schoolName} className="mt-1" />
-      </label>
-
-      <div className="flex items-center gap-3">
-        <label className="inline-flex items-center gap-2 select-none">
-          <input
-            type="checkbox"
-            checked={is_team}
-            onChange={(e) => setIsTeam(e.target.checked)}
-            disabled={disabled}
-            className="size-4 rounded border-foreground/30 accent-blue-600"
-          />
-          <span className="text-sm">Team submission</span>
-        </label>
-      </div>
-
-      {is_team ? (
-        <>
-          <label className="block">
-            <div className="mb-1 text-sm text-foreground/80">Team Name</div>
-          <input
-            value={groupName}
-            onChange={(e) => setGroupName(e.target.value)}
-            onBlur={(e) => setGroupName(e.target.value.trim())}
-            disabled={disabled}
-            className={baseInput}
-            placeholder="Enter team name (English only)"
-          />
-          <FieldError message={errors.groupName} className="mt-1" />
-        </label>
-          <div>
-            <div className="mb-1 text-sm text-foreground/80">Members</div>
-            <div className="flex flex-col gap-2">
-              {members.map((m, idx) => (
-                <div key={idx} className="flex items-center gap-2">
-                  <input
-                    value={m}
-                    onChange={(e) => {
-                      const next = members.slice();
-                      next[idx] = e.target.value;
-                      setMembers(next);
-                    }}
-                    onBlur={(e) => {
-                      const next = members.slice();
-                      next[idx] = e.target.value.trim();
-                      setMembers(next);
-                    }}
-                    disabled={disabled}
-                    className={baseInput}
-                    placeholder={`Member ${idx + 1} (English only)`}
-                  />
-                  {members.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const next = members.slice();
-                        next.splice(idx, 1);
-                        setMembers(next.length ? next : [""]);
-                      }}
-                      className="h-10 rounded-xl border border-foreground/15 px-3 text-sm hover:bg-white/10"
-                    >
-                      Remove
-                    </button>
-                  )}
-                </div>
-              ))}
-             <button
-               type="button"
-               onClick={() => setMembers([...members, ""])}
-               className="h-10 w-fit rounded-xl bg-blue-600 px-4 text-white text-sm font-medium shadow-lg shadow-blue-600/20"
-             >
-               + Add member
-             </button>
-              <FieldError message={errors.members} className="mt-1" />
-              {members.map((_, idx) => (
-                <FieldError
-                  key={idx}
-                  message={errors[`members_${idx}`]}
-                  className="mt-1"
-                />
-              ))}
-            </div>
-          </div>
-        </>
-      ) : (
-        <label className="block">
-          <div className="mb-1 text-sm text-foreground/80">your hacker name</div>
-          <input
-            value={person_name}
-            onChange={(e) => setPersonName(e.target.value)}
-            onBlur={(e) => setPersonName(e.target.value.trim())}
-            disabled={disabled}
-            className={baseInput}
-            placeholder="Enter your hacker name"
-          />
-          <FieldError message={errors.person_name} className="mt-1" />
-        </label>
-      )}
-    </div>
   );
 }
