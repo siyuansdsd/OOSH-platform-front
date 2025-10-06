@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TouchEvent } from "react";
 import type { HomeworkRecord } from "@/lib/api/homeworks";
 import Spinner from "@/components/ui/Spinner";
+
+const UNTITLED_LABEL_PATTERN = /^untitled(?:\s+project)?$/i;
 
 interface GalleryProps {
   items: HomeworkRecord[];
@@ -24,7 +26,7 @@ interface WebsitePreviewProps {
 
 function WebsitePreview({ url, interactive = true }: WebsitePreviewProps) {
   const [image, setImage] = useState<string>("");
-  const [loading, setLoading] = useState(false);
+  const [_loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!url) return;
@@ -98,6 +100,7 @@ function WebsitePreview({ url, interactive = true }: WebsitePreviewProps) {
   if (!interactive) {
     return (
       <div className="relative aspect-[4/3] overflow-hidden rounded-2xl">
+        {/* biome-ignore lint/performance/noImgElement: static preview rendering */}
         <img
           src={image}
           alt="Website preview"
@@ -114,6 +117,7 @@ function WebsitePreview({ url, interactive = true }: WebsitePreviewProps) {
       rel="noreferrer"
       className="group relative block aspect-[4/3] overflow-hidden rounded-2xl"
     >
+      {/* biome-ignore lint/performance/noImgElement: static preview rendering */}
       <img
         src={image}
         alt="Website preview"
@@ -132,8 +136,8 @@ export function Gallery({
   loadingMore,
   onLoadMore,
   hasMore,
-  rawTotal = null,
-  rawHasMore = null,
+  rawTotal: _rawTotal = null,
+  rawHasMore: _rawHasMore = null,
   className = "",
   emptyState,
 }: GalleryProps) {
@@ -175,11 +179,14 @@ export function Gallery({
   }, [isMobileView, onLoadMore]);
 
   const modalTitle = modalItem
-    ? modalItem.title ||
-      modalItem.groupName ||
-      modalItem.personName ||
-      "Project"
+    ? (modalItem.title?.trim() ||
+        modalItem.groupName?.trim() ||
+        modalItem.personName?.trim() ||
+        "")
     : "";
+  const modalMediaAlt = modalItem
+    ? modalTitle || modalItem.schoolName?.trim() || "Project media"
+    : "Project media";
   const modalStudents = modalItem
     ? Array.from(
         new Set([
@@ -259,6 +266,12 @@ export function Gallery({
     return parts.filter(Boolean).join(" · ");
   }, [modalItem, modalStudents]);
 
+  const hasDescription = Boolean(modalItem?.description?.trim());
+  const hasSchoolName = Boolean(modalItem?.schoolName?.trim());
+  const hasDetailLine = Boolean(detailLine);
+  const showDetailBlock =
+    Boolean(modalTitle) || hasDescription || hasDetailLine || hasSchoolName;
+
   const openModal = (item: HomeworkRecord) => {
     setModalItem(item);
   };
@@ -273,6 +286,12 @@ export function Gallery({
     const videoRef = useRef<HTMLVideoElement | null>(null);
     const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const [videoActive, setVideoActive] = useState(false);
+    const mediaAlt =
+      item.title?.trim() ||
+      item.groupName?.trim() ||
+      item.personName?.trim() ||
+      item.schoolName?.trim() ||
+      "Project media";
 
     // Detect mobile devices and tablets (including iPad)
     const isMobile = useMemo(() => {
@@ -343,14 +362,14 @@ export function Gallery({
       });
     }
 
-    const clearTimer = () => {
+    const clearTimer = useCallback(() => {
       if (hoverTimer.current) {
         clearTimeout(hoverTimer.current);
         hoverTimer.current = null;
       }
-    };
+    }, []);
 
-    const stopVideo = () => {
+    const stopVideo = useCallback(() => {
       clearTimer();
       const videoEl = videoRef.current;
       if (videoEl) {
@@ -360,9 +379,9 @@ export function Gallery({
         } catch {}
       }
       setVideoActive(false);
-    };
+    }, [clearTimer]);
 
-    const schedulePlay = () => {
+    const schedulePlay = useCallback(() => {
       if (videoCount === 0 || isMobile) return;
       clearTimer();
       hoverTimer.current = setTimeout(() => {
@@ -380,21 +399,20 @@ export function Gallery({
           }
         }
       }, 900);
-    };
+    }, [clearTimer, isMobile, videoCount]);
 
-    useEffect(() => () => stopVideo(), []);
+    useEffect(() => () => stopVideo(), [stopVideo]);
     useEffect(() => {
       stopVideo();
-    }, [item.id]);
+    }, [stopVideo]);
 
     if (imageCount > 0) {
       return (
         <div className="group relative aspect-[4/3] w-full overflow-hidden rounded-2xl">
+          {/* biome-ignore lint/performance/noImgElement: legacy content served via CDNs */}
           <img
             src={item.images[0]}
-            alt={
-              item.title || item.groupName || item.personName || "Project image"
-            }
+            alt={mediaAlt}
             className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
           />
           {badges.length > 0 ? (
@@ -421,9 +439,10 @@ export function Gallery({
       if (isMobile) {
         return (
           <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-black">
+            {/* biome-ignore lint/performance/noImgElement: video poster fallback */}
             <img
               src={coverSrc}
-              alt={item.title || item.groupName || item.personName || "Video cover"}
+              alt={mediaAlt}
               className="h-full w-full object-cover"
             />
             <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
@@ -465,9 +484,10 @@ export function Gallery({
           onMouseEnter={schedulePlay}
           onMouseLeave={stopVideo}
         >
+          {/* biome-ignore lint/performance/noImgElement: video poster fallback */}
           <img
             src={coverSrc}
-            alt={item.title || item.groupName || item.personName || "Video cover"}
+            alt={mediaAlt}
             className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
               videoActive ? "opacity-0" : "opacity-100"
             }`}
@@ -540,11 +560,11 @@ export function Gallery({
     <div className={`flex flex-col gap-6 ${className}`}>
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
         {gridItems.map((item) => {
+          const primaryTitle = [item.title, item.groupName, item.personName]
+            .map((value) => value?.trim())
+            .find((value) => value && !UNTITLED_LABEL_PATTERN.test(value));
           const cardTitle =
-            item.title ||
-            item.groupName ||
-            item.personName ||
-            "Untitled project";
+            primaryTitle ?? item.schoolName?.trim() ?? "Unknown school";
           return (
             <article
               key={item.id}
@@ -650,12 +670,14 @@ export function Gallery({
                           className="flex h-full w-full flex-shrink-0 items-center justify-center bg-black/80"
                         >
                           {media.type === "image" ? (
+                            {/* biome-ignore lint/performance/noImgElement: modal media preview */}
                             <img
                               src={media.src}
-                              alt={modalTitle}
+                              alt={modalMediaAlt}
                               className="h-full w-full object-contain"
                             />
                           ) : media.type === "video" ? (
+                            {/* biome-ignore lint/a11y/useMediaCaption: user-generated clips ship without captions */}
                             <video
                               src={media.src}
                               controls
@@ -724,24 +746,28 @@ export function Gallery({
                 )}
               </div>
 
-              <div className="space-y-3">
-                <h2 className="text-xl font-semibold text-white sm:text-2xl">
-                  {modalTitle}
-                </h2>
-                {detailLine ? (
-                  <p className="text-sm text-white/80">{detailLine}</p>
-                ) : null}
-                {modalItem.schoolName ? (
-                  <p className="text-xs uppercase tracking-wide text-white/60">
-                    {modalItem.schoolName}
-                  </p>
-                ) : null}
-                {modalItem.description ? (
-                  <p className="text-sm leading-relaxed text-white/90">
-                    {modalItem.description}
-                  </p>
-                ) : null}
-              </div>
+              {showDetailBlock ? (
+                <div className="space-y-3">
+                  {modalTitle ? (
+                    <h2 className="text-xl font-semibold text-white sm:text-2xl">
+                      {modalTitle}
+                    </h2>
+                  ) : null}
+                  {detailLine ? (
+                    <p className="text-sm text-white/80">{detailLine}</p>
+                  ) : null}
+                  {modalItem?.schoolName?.trim() ? (
+                    <p className="text-xs uppercase tracking-wide text-white/60">
+                      {modalItem.schoolName}
+                    </p>
+                  ) : null}
+                  {hasDescription ? (
+                    <p className="text-sm leading-relaxed text-white/90">
+                      {modalItem?.description?.trim()}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
 
               {modalItem.urls.length > 0 ? (
                 <div className="flex flex-wrap gap-2">

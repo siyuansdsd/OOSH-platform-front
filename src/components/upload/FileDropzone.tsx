@@ -69,20 +69,28 @@ export default function FileDropzone({
 
   const handleFiles = useCallback(
     (files: FileList | File[]) => {
-      setError(null);
-      const list = Array.from(files).filter((f) =>
-        /^(image|video)\//.test(f.type),
+      const list = Array.from(files).filter((file) =>
+        /^(image|video)\//.test(file.type),
       );
+      if (list.length === 0) return;
 
-      const combined = [...value, ...list].slice(0, maxCount);
-      const bytes = combined.reduce((a, f) => a + f.size, 0);
-      if (combined.length > maxCount) {
-        setError(`Up to ${maxCount} files allowed`);
-      } else if (bytes > maxTotalBytes) {
+      setError(null);
+
+      const merged = [...value, ...list];
+      const hitMaxCount = merged.length > maxCount;
+      const nextFiles = hitMaxCount ? merged.slice(0, maxCount) : merged;
+      const totalSelectedBytes = nextFiles.reduce((sum, file) => sum + file.size, 0);
+
+      if (totalSelectedBytes > maxTotalBytes) {
         setError(`Total size must be under ${maxSizeLabel}`);
-        return; // don't update if size fails
+        return;
       }
-      onChange(combined);
+
+      if (hitMaxCount) {
+        setError(`Up to ${maxCount} files allowed`);
+      }
+
+      onChange(nextFiles);
     },
     [maxCount, maxTotalBytes, maxSizeLabel, onChange, value],
   );
