@@ -670,14 +670,14 @@ export function Gallery({
                           className="flex h-full w-full flex-shrink-0 items-center justify-center bg-black/80"
                         >
                           {media.type === "image" ? (
-                            {/* biome-ignore lint/performance/noImgElement: modal media preview */}
+                            /* biome-ignore lint/performance/noImgElement -- modal media preview */
                             <img
                               src={media.src}
                               alt={modalMediaAlt}
                               className="h-full w-full object-contain"
                             />
                           ) : media.type === "video" ? (
-                            {/* biome-ignore lint/a11y/useMediaCaption: user-generated clips ship without captions */}
+                            /* biome-ignore lint/a11y/useMediaCaption -- user-generated clips ship without captions */
                             <video
                               src={media.src}
                               controls
