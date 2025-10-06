@@ -1,6 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type HTMLAttributes,
+  type ReactNode,
+} from "react";
 import type { TouchEvent } from "react";
 import type { HomeworkRecord } from "@/lib/api/homeworks";
 import Spinner from "@/components/ui/Spinner";
@@ -23,6 +31,30 @@ interface WebsitePreviewProps {
   url: string;
   interactive?: boolean;
 }
+
+interface AspectRatioBoxProps
+  extends Omit<HTMLAttributes<HTMLDivElement>, "children"> {
+  ratio?: number;
+  className?: string;
+  contentClassName?: string;
+  children: ReactNode;
+}
+
+const AspectRatioBox = ({
+  ratio = 4 / 3,
+  className = "",
+  contentClassName = "",
+  children,
+  ...rest
+}: AspectRatioBoxProps) => {
+  const paddingBottom = `${(100 / ratio).toFixed(4)}%`;
+  return (
+    <div className={`relative w-full ${className}`} {...rest}>
+      <div style={{ paddingBottom }} aria-hidden="true" />
+      <div className={`absolute inset-0 ${contentClassName}`}>{children}</div>
+    </div>
+  );
+};
 
 function WebsitePreview({ url, interactive = true }: WebsitePreviewProps) {
   const [image, setImage] = useState<string>("");
@@ -61,9 +93,12 @@ function WebsitePreview({ url, interactive = true }: WebsitePreviewProps) {
 
   if (!url) {
     return (
-      <div className="flex aspect-[4/3] items-center justify-center rounded-2xl bg-foreground/5 text-sm text-foreground/60">
+      <AspectRatioBox
+        className="overflow-hidden rounded-2xl"
+        contentClassName="flex items-center justify-center rounded-2xl bg-foreground/5 text-sm text-foreground/60"
+      >
         No website provided
-      </div>
+      </AspectRatioBox>
     );
   }
 
@@ -71,7 +106,10 @@ function WebsitePreview({ url, interactive = true }: WebsitePreviewProps) {
 
   if (!image || looksLikeIcon(image)) {
     const frame = (
-      <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-foreground/5">
+      <AspectRatioBox
+        className="overflow-hidden rounded-2xl bg-foreground/5"
+        contentClassName="overflow-hidden rounded-2xl"
+      >
         <iframe
           src={url}
           loading="lazy"
@@ -86,7 +124,7 @@ function WebsitePreview({ url, interactive = true }: WebsitePreviewProps) {
           }}
           title="Website preview"
         />
-      </div>
+      </AspectRatioBox>
     );
     return interactive ? (
       <a href={url} target="_blank" rel="noreferrer" className="block">
@@ -99,33 +137,38 @@ function WebsitePreview({ url, interactive = true }: WebsitePreviewProps) {
 
   if (!interactive) {
     return (
-      <div className="relative aspect-[4/3] overflow-hidden rounded-2xl">
+      <AspectRatioBox
+        className="overflow-hidden rounded-2xl"
+        contentClassName="overflow-hidden rounded-2xl"
+      >
         {/* biome-ignore lint/performance/noImgElement: static preview rendering */}
         <img
           src={image}
           alt="Website preview"
           className="h-full w-full object-cover"
         />
-      </div>
+      </AspectRatioBox>
     );
   }
 
   return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noreferrer"
-      className="group relative block aspect-[4/3] overflow-hidden rounded-2xl"
-    >
-      {/* biome-ignore lint/performance/noImgElement: static preview rendering */}
-      <img
-        src={image}
-        alt="Website preview"
-        className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-      />
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-3 text-sm text-white">
-        Visit website →
-      </div>
+    <a href={url} target="_blank" rel="noreferrer" className="group block">
+      <AspectRatioBox
+        className="overflow-hidden rounded-2xl"
+        contentClassName="overflow-hidden rounded-2xl"
+      >
+        <div className="relative h-full w-full">
+          {/* biome-ignore lint/performance/noImgElement: static preview rendering */}
+          <img
+            src={image}
+            alt="Website preview"
+            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+          />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent p-3 text-sm text-white">
+            Visit website →
+          </div>
+        </div>
+      </AspectRatioBox>
     </a>
   );
 }
@@ -408,56 +451,14 @@ export function Gallery({
 
     if (imageCount > 0) {
       return (
-        <div className="group relative aspect-[4/3] w-full overflow-hidden rounded-2xl">
-          {/* biome-ignore lint/performance/noImgElement: legacy content served via CDNs */}
-          <img
-            src={item.images[0]}
-            alt={mediaAlt}
-            className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
-          />
-          {badges.length > 0 ? (
-            <div className="pointer-events-none absolute right-3 top-3 flex w-32 flex-col items-end gap-1 text-xs font-semibold text-white">
-              {badges.map((badge) => (
-                <span
-                  key={badge.label}
-                  className={`inline-flex w-full justify-center rounded-full px-3 py-1 ${
-                    badge.variant === "video"
-                      ? "bg-sky-500/80"
-                      : "bg-orange-500/80"
-                  }`}
-                >
-                  {badge.label}
-                </span>
-              ))}
-            </div>
-          ) : null}
-        </div>
-      );
-    }
-
-    if (videoCount > 0) {
-      if (isMobile) {
-        return (
-          <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-black">
-            {/* biome-ignore lint/performance/noImgElement: video poster fallback */}
+        <AspectRatioBox className="group overflow-hidden rounded-2xl">
+          <div className="relative h-full w-full">
+            {/* biome-ignore lint/performance/noImgElement: legacy content served via CDNs */}
             <img
-              src={coverSrc}
+              src={item.images[0]}
               alt={mediaAlt}
-              className="h-full w-full object-cover"
+              className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
             />
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="flex size-12 items-center justify-center rounded-full bg-black/60 text-white shadow-lg">
-                <svg
-                  width="20"
-                  height="20"
-                  viewBox="0 0 24 24"
-                  fill="white"
-                  className="ml-1"
-                >
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              </div>
-            </div>
             {badges.length > 0 ? (
               <div className="pointer-events-none absolute right-3 top-3 flex w-32 flex-col items-end gap-1 text-xs font-semibold text-white">
                 {badges.map((badge) => (
@@ -475,63 +476,111 @@ export function Gallery({
               </div>
             ) : null}
           </div>
+        </AspectRatioBox>
+      );
+    }
+
+    if (videoCount > 0) {
+      if (isMobile) {
+        return (
+          <AspectRatioBox className="overflow-hidden rounded-2xl bg-black">
+            <div className="relative h-full w-full">
+              {/* biome-ignore lint/performance/noImgElement: video poster fallback */}
+              <img
+                src={coverSrc}
+                alt={mediaAlt}
+                className="h-full w-full object-cover"
+              />
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <div className="flex size-12 items-center justify-center rounded-full bg-black/60 text-white shadow-lg">
+                  <svg
+                    width="20"
+                    height="20"
+                    viewBox="0 0 24 24"
+                    fill="white"
+                    className="ml-1"
+                  >
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </div>
+              </div>
+              {badges.length > 0 ? (
+                <div className="pointer-events-none absolute right-3 top-3 flex w-32 flex-col items-end gap-1 text-xs font-semibold text-white">
+                  {badges.map((badge) => (
+                    <span
+                      key={badge.label}
+                      className={`inline-flex w-full justify-center rounded-full px-3 py-1 ${
+                        badge.variant === "video"
+                          ? "bg-sky-500/80"
+                          : "bg-orange-500/80"
+                      }`}
+                    >
+                      {badge.label}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </AspectRatioBox>
         );
       }
 
       return (
-        <div
-          className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-black"
+        <AspectRatioBox
+          className="overflow-hidden rounded-2xl bg-black"
           onMouseEnter={schedulePlay}
           onMouseLeave={stopVideo}
         >
-          {/* biome-ignore lint/performance/noImgElement: video poster fallback */}
-          <img
-            src={coverSrc}
-            alt={mediaAlt}
-            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
-              videoActive ? "opacity-0" : "opacity-100"
-            }`}
-          />
-          <video
-            ref={videoRef}
-            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 pointer-events-none ${
-              videoActive ? "opacity-100" : "opacity-0"
-            }`}
-            src={item.videos[0]}
-            muted
-            loop
-            playsInline
-            preload="metadata"
-            controls={false}
-          >
-            Your browser does not support the video tag.
-          </video>
-          {!videoActive ? (
-            <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-              <div className="flex size-12 items-center justify-center rounded-full bg-black/60 text-white shadow-lg">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="white" className="ml-1">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
+          <div className="relative h-full w-full">
+            {/* biome-ignore lint/performance/noImgElement: video poster fallback */}
+            <img
+              src={coverSrc}
+              alt={mediaAlt}
+              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 ${
+                videoActive ? "opacity-0" : "opacity-100"
+              }`}
+            />
+            <video
+              ref={videoRef}
+              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-300 pointer-events-none ${
+                videoActive ? "opacity-100" : "opacity-0"
+              }`}
+              src={item.videos[0]}
+              muted
+              loop
+              playsInline
+              preload="metadata"
+              controls={false}
+            >
+              Your browser does not support the video tag.
+            </video>
+            {!videoActive ? (
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+                <div className="flex size-12 items-center justify-center rounded-full bg-black/60 text-white shadow-lg">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="white" className="ml-1">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </div>
               </div>
-            </div>
-          ) : null}
-          {badges.length > 0 ? (
-            <div className="pointer-events-none absolute right-3 top-3 flex w-32 flex-col items-end gap-1 text-xs font-semibold text-white">
-              {badges.map((badge) => (
-                <span
-                  key={badge.label}
-                  className={`inline-flex w-full justify-center rounded-full px-3 py-1 ${
-                    badge.variant === "video"
-                      ? "bg-sky-500/80"
-                      : "bg-orange-500/80"
-                  }`}
-                >
-                  {badge.label}
-                </span>
-              ))}
-            </div>
-          ) : null}
-        </div>
+            ) : null}
+            {badges.length > 0 ? (
+              <div className="pointer-events-none absolute right-3 top-3 flex w-32 flex-col items-end gap-1 text-xs font-semibold text-white">
+                {badges.map((badge) => (
+                  <span
+                    key={badge.label}
+                    className={`inline-flex w-full justify-center rounded-full px-3 py-1 ${
+                      badge.variant === "video"
+                        ? "bg-sky-500/80"
+                        : "bg-orange-500/80"
+                    }`}
+                  >
+                    {badge.label}
+                  </span>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        </AspectRatioBox>
       );
     }
 
@@ -540,9 +589,12 @@ export function Gallery({
     }
 
     return (
-      <div className="flex aspect-[4/3] items-center justify-center rounded-2xl bg-foreground/5 text-sm text-foreground/60">
+      <AspectRatioBox
+        className="overflow-hidden rounded-2xl"
+        contentClassName="flex items-center justify-center rounded-2xl bg-foreground/5 text-sm text-foreground/60"
+      >
         No media available
-      </div>
+      </AspectRatioBox>
     );
   };
 
