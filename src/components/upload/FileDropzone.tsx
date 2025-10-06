@@ -1,14 +1,36 @@
-import React, { useCallback, useMemo, useRef, useState } from "react";
+import Image from "next/image";
+import type { DragEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useUploadCtx } from "./UploadContext";
 
 type SelectedItem = {
   file: File;
   id: string;
+  previewUrl: string;
+};
+
+const formatFileSize = (bytes: number): string => {
+  const gb = 1024 * 1024 * 1024;
+  const mb = 1024 * 1024;
+  const kb = 1024;
+
+  if (bytes >= gb) {
+    const value = bytes / gb;
+    return Number.isInteger(value) ? `${value}GB` : `${value.toFixed(2)}GB`;
+  }
+  if (bytes >= mb) {
+    const value = bytes / mb;
+    return Number.isInteger(value) ? `${value}MB` : `${value.toFixed(2)}MB`;
+  }
+  if (bytes >= kb) {
+    return `${(bytes / kb).toFixed(2)}KB`;
+  }
+  return `${bytes}B`;
 };
 
 export default function FileDropzone({
-  maxCount = 4,
-  maxTotalBytes = 200 * 1024 * 1024, // 200MB
+  maxCount = 30,
+  maxTotalBytes = 1024 * 1024 * 1024, // 1GB
 }: {
   maxCount?: number;
   maxTotalBytes?: number;
@@ -19,20 +41,37 @@ export default function FileDropzone({
   const [error, setError] = useState<string | null>(null);
 
   const selected: SelectedItem[] = useMemo(
-    () => value.map((f, i) => ({ file: f, id: `${i}-${f.name}-${f.size}` })),
-    [value]
+    () =>
+      value.map((f, i) => ({
+        file: f,
+        id: `${i}-${f.name}-${f.size}`,
+        previewUrl: URL.createObjectURL(f),
+      })),
+    [value],
   );
 
+  useEffect(
+    () => () => {
+      selected.forEach(({ previewUrl }) => {
+        URL.revokeObjectURL(previewUrl);
+      });
+    },
+    [selected],
+  );
   const totalBytes = useMemo(
     () => value.reduce((a, f) => a + f.size, 0),
-    [value]
+    [value],
+  );
+  const maxSizeLabel = useMemo(
+    () => formatFileSize(maxTotalBytes),
+    [maxTotalBytes],
   );
 
   const handleFiles = useCallback(
     (files: FileList | File[]) => {
       setError(null);
       const list = Array.from(files).filter((f) =>
-        /^(image|video)\//.test(f.type)
+        /^(image|video)\//.test(f.type),
       );
 
       const combined = [...value, ...list].slice(0, maxCount);
@@ -40,21 +79,21 @@ export default function FileDropzone({
       if (combined.length > maxCount) {
         setError(`Up to ${maxCount} files allowed`);
       } else if (bytes > maxTotalBytes) {
-        setError("Total size must be under 200MB");
+        setError(`Total size must be under ${maxSizeLabel}`);
         return; // don't update if size fails
       }
       onChange(combined);
     },
-    [maxCount, maxTotalBytes, onChange, value]
+    [maxCount, maxTotalBytes, maxSizeLabel, onChange, value],
   );
 
   const onDrop = useCallback(
-    (e: React.DragEvent) => {
+    (e: DragEvent<HTMLDivElement>) => {
       e.preventDefault();
       setDragOver(false);
       handleFiles(e.dataTransfer.files);
     },
-    [handleFiles]
+    [handleFiles],
   );
 
   const openPicker = useCallback(() => {
@@ -69,8 +108,9 @@ export default function FileDropzone({
 
   return (
     <div className="flex flex-col gap-3">
-      <div
-        className={`rounded-2xl border-2 border-dashed p-6 transition-all duration-200 ${
+      <button
+        type="button"
+        className={`rounded-2xl border-2 border-dashed p-6 transition-all duration-200 focus:outline-none ${
           dragOver
             ? "border-blue-500/70 bg-blue-500/5"
             : "border-foreground/20 hover:border-foreground/40"
@@ -81,12 +121,9 @@ export default function FileDropzone({
         }}
         onDragLeave={() => setDragOver(false)}
         onDrop={onDrop}
-        role="button"
-        tabIndex={0}
         onClick={openPicker}
-        onKeyDown={(e) => (e.key === "Enter" ? openPicker() : null)}
       >
-        <div className="flex flex-col items-center justify-center gap-2 text-center select-none">
+        <span className="flex flex-col items-center justify-center gap-2 text-center select-none">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
@@ -94,6 +131,7 @@ export default function FileDropzone({
             stroke="currentColor"
             className="size-8 text-foreground/70"
           >
+            <title>Upload media</title>
             <path
               strokeLinecap="round"
               strokeLinejoin="round"
@@ -101,44 +139,47 @@ export default function FileDropzone({
               d="M9 13h6m-8 8h10a2 2 0 0 0 2-2V9.828a2 2 0 0 0-.586-1.414l-3.828-3.828A2 2 0 0 0 13.172 4H7a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z"
             />
           </svg>
-          <div className="text-sm text-foreground/80">
+          <span className="text-sm text-foreground/80">
             Drag and drop Images or Videos here, or click to select
-          </div>
-          <div className="text-xs text-foreground/60">
-            Up to {maxCount} files. Total size under 200MB.
-          </div>
-        </div>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/*,video/*"
-          multiple
-          className="hidden"
-          onChange={(e) => e.target.files && handleFiles(e.target.files)}
-        />
-      </div>
+          </span>
+          <span className="text-xs text-foreground/60">
+            Up to {maxCount} files. Total size under {maxSizeLabel}.
+          </span>
+        </span>
+      </button>
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*,video/*"
+        multiple
+        className="hidden"
+        onChange={(e) => e.target.files && handleFiles(e.target.files)}
+      />
 
       {error ? (
         <p className="text-xs text-red-500">{error}</p>
       ) : (
         <p className="text-xs text-foreground/60">
-          Selected {value.length} • Total{" "}
-          {(totalBytes / (1024 * 1024)).toFixed(1)} MB
+          Selected {value.length} • Total {formatFileSize(totalBytes)}
         </p>
       )}
 
       {!!selected.length && (
         <ul className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {selected.map(({ file }, idx) => (
+          {selected.map(({ file, previewUrl }, idx) => (
             <li
               key={`${idx}-${file.name}`}
               className="rounded-xl border border-foreground/10 bg-white/5 p-3 backdrop-blur-sm flex gap-3 items-center"
             >
               <div className="size-14 shrink-0 overflow-hidden rounded-md bg-black/5 flex items-center justify-center">
                 {/^image\//.test(file.type) ? (
-                  <img
-                    src={URL.createObjectURL(file)}
+                  <Image
+                    src={previewUrl}
                     alt={file.name}
+                    width={56}
+                    height={56}
+                    unoptimized
                     className="h-full w-full object-cover"
                   />
                 ) : (
